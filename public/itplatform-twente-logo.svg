@@ -1,0 +1,26 @@
+<svg viewBox="0 0 260 74" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="IT Platform Twente">
+  <text 
+    x="130" 
+    y="30" 
+    text-anchor="middle" 
+    font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
+    font-weight="900" 
+    font-size="31" 
+    fill="#171717" 
+    letter-spacing="-0.5px"
+  >
+    IT Platform
+  </text>
+  <text 
+    x="130" 
+    y="65" 
+    text-anchor="middle" 
+    font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" 
+    font-weight="900" 
+    font-size="37" 
+    fill="#e30613" 
+    letter-spacing="-0.5px"
+  >
+    Twente
+  </text>
+</svg>

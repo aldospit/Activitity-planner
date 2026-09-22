@@ -1,0 +1,5 @@
+{
+  "name": "IT Platform Twente - Activiteiten, taakbeheer en datumprikker",
+  "description": "Een alles-in-één projecten- en verkenningentracker met Gantt-chart tijdlijn, datumprikker, weekplanner, Outlook-stijl gedeelde agenda's en Notities, Afspraken en Actiepunten beheer met e-mailverzending.",
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

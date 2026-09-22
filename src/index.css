@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Base body typography settings */
+body {
+  font-family: var(--font-sans);
+}
+
+@media print {
+  * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  body {
+    background: white !important;
+    color: #0f172a !important;
+  }
+  
+  /* Hide headers/nav tabs/footers during print */
+  header, nav, footer, .print\:hidden, button, select, input {
+    display: none !important;
+  }
+
+  #year-calendar-root, #project-planner-view {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  #year-calendar-root .max-w-7xl, #project-planner-view .max-w-7xl {
+    max-width: 100% !important;
+  }
+
+  #project-planner-view .overflow-x-auto, #project-planner-view .overflow-y-auto {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* Set A4 page format rules */
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+}

@@ -1,0 +1,249 @@
+{
+  "entities": {
+    "poll": {
+      "title": "Poll",
+      "description": "Represents a date-planning poll",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "options": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "sentAt": { "type": "string", "format": "date-time" },
+        "finalizedOptionId": { "type": "string" },
+        "invitationTemplate": { "type": "string" },
+        "confirmationTemplate": { "type": "string" }
+      },
+      "required": ["id", "title", "createdAt"]
+    },
+    "invitee": {
+      "title": "Invitee",
+      "description": "An invitee and their votes on a specific poll",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pollId": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "votes": { "type": "object" },
+        "comment": { "type": "string" },
+        "votedAt": { "type": "string", "format": "date-time" },
+        "reminderSentAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "pollId", "email"]
+    },
+    "contact": {
+      "title": "Contact",
+      "description": "A reusable contact in the organizer's address book",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["id", "firstName", "lastName", "email"]
+    },
+    "notification": {
+      "title": "Notification",
+      "description": "A real-time notification about poll votes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "pollId": { "type": "string" },
+        "pollTitle": { "type": "string" },
+        "inviteeName": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["id", "pollId", "pollTitle", "inviteeName", "timestamp", "read"]
+    },
+    "task": {
+      "title": "Task",
+      "description": "Represents a user-scheduled task or calendar agenda item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "completed": { "type": "boolean" },
+        "archived": { "type": "boolean" },
+        "priority": { "type": "boolean" },
+        "statusId": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "isCalendarItem": { "type": "boolean" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "recurrence": { "type": "string", "enum": ["none", "weekly", "monthly"] },
+        "recurrenceDay": { "type": "number" },
+        "recurrenceExceptions": { "type": "array" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "title", "startDate", "completed", "archived", "priority", "statusId", "categoryId", "isCalendarItem", "recurrence", "recurrenceExceptions", "ownerId"]
+    },
+    "taskStatus": {
+      "title": "TaskStatus",
+      "description": "A status lane for board view (e.g., Todo, Gepland, Gereed)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "order": { "type": "number" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "name", "color", "order", "ownerId"]
+    },
+    "taskCategory": {
+      "title": "TaskCategory",
+      "description": "A user-defined category tag for tasks (e.g., Werk, Werkzaamheden, Persoonlijk)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "name", "color", "ownerId"]
+    },
+    "calendarCategory": {
+      "title": "CalendarCategory",
+      "description": "A customized event category for year calendar",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "name", "color", "ownerId"]
+    },
+    "yearEvent": {
+      "title": "YearEvent",
+      "description": "An event scheduled on the year calendar",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "year": { "type": "number" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "type": { "type": "string" },
+        "recurrence": { "type": "string" },
+        "recurrenceEnd": { "type": "string" },
+        "isFeestdag": { "type": "boolean" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "year", "title", "categoryId", "date", "type", "ownerId"]
+    },
+    "meeting": {
+      "title": "Meeting",
+      "description": "A meeting with prepared agenda, minutes, participants and calendar metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "meetingType": { "type": "string" },
+        "projectOrSubject": { "type": "string" },
+        "location": { "type": "string" },
+        "participants": { "type": "array" },
+        "agenda": { "type": "string" },
+        "agendaStatus": { "type": "string", "enum": ["concept", "definitief", "verzonden"] },
+        "agendaUpdatedAt": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "title", "date", "meetingType", "projectOrSubject"]
+    },
+    "meetingAgreement": {
+      "title": "MeetingAgreement",
+      "description": "An agreement made during a meeting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "meetingId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "projectOrSubject": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "meetingId", "title", "date", "status"]
+    },
+    "meetingActionItem": {
+      "title": "MeetingActionItem",
+      "description": "An action item tracked for a meeting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "meetingId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "assignees": { "type": "array" },
+        "status": { "type": "string" },
+        "dueDate": { "type": "string" }
+      },
+      "required": ["id", "meetingId", "title", "dueDate", "status"]
+    }
+  },
+  "firestore": {
+    "polls": {
+      "schema": "poll",
+      "description": "The collection of date planning polls"
+    },
+    "invitees": {
+      "schema": "invitee",
+      "description": "The collection of respondents and votes"
+    },
+    "contacts": {
+      "schema": "contact",
+      "description": "The collection of general address book contacts"
+    },
+    "notifications": {
+      "schema": "notification",
+      "description": "The collection of activity notifications for the dashboard"
+    },
+    "tasks": {
+      "schema": "task",
+      "description": "The user-created week planning tasks"
+    },
+    "task_statuses": {
+      "schema": "taskStatus",
+      "description": "The user-created task status columns"
+    },
+    "task_categories": {
+      "schema": "taskCategory",
+      "description": "The user-created task categories"
+    },
+    "calendar_categories": {
+      "schema": "calendarCategory",
+      "description": "The custom calendar categories for the year calendar"
+    },
+    "year_events": {
+      "schema": "yearEvent",
+      "description": "The event entries on the year calendar"
+    },
+    "meetings": {
+      "schema": "meeting",
+      "description": "The meetings collection with agendas and notes"
+    },
+    "meeting_agreements": {
+      "schema": "meetingAgreement",
+      "description": "Agreements registered per meeting"
+    },
+    "meeting_action_items": {
+      "schema": "meetingActionItem",
+      "description": "Action items tracked per meeting"
+    }
+  }
+}

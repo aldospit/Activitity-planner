@@ -1,0 +1,569 @@
+import { BackupDataPayload } from '../services/db';
+import { Project, ProjectActivity, Task, Ticket, TicketCategory, TicketStatus, TicketHandler, TicketComment } from '../types';
+
+export const rdngProjects: Project[] = [
+  {
+    id: 'proj-rdng-3',
+    title: 'RDNG 3.0 - Regionaal Digitaal Netwerk Gemeenten',
+    description: 'Realisatie, migratie en modernisering van het regionale glasvezel- en datanetwerk RDNG 3.0 voor Twentse gemeenten, veiligheidsregio en samenwerkingspartners.',
+    type: 'project',
+    createdAt: '2026-05-01T08:00:00.000Z'
+  },
+  {
+    id: 'proj-rk-2',
+    title: 'Regionaal Knooppunt 2.0',
+    description: 'Modernisering en redundant inrichten van het Regionaal Knooppunt (RK 2.0) voor veilige ketenintegratie, GGI-koppelingen, Digikoppeling en intergemeentelijke gegevensuitwisseling.',
+    type: 'project',
+    createdAt: '2026-05-10T08:00:00.000Z'
+  },
+  {
+    id: 'proj-pki-cert',
+    title: 'Vervanging PKI overheid certificaten',
+    description: 'Projectmatige vernieuwing en transitie van alle PKIoverheid server-, koppelvlak- en servicescertificaten (G3/G4, Digikoppeling, TLS/SSL, Suwinet en API-gateways) voor alle aangesloten gemeentelijke voorzieningen.',
+    type: 'project',
+    createdAt: '2026-06-01T08:00:00.000Z'
+  },
+  {
+    id: 'proj-rdng-exp',
+    title: 'RDNG 3.0 - Verkenning SD-WAN & Zero Trust',
+    description: 'Onderzoek naar implementatie van SD-WAN en Zero Trust Network Access (ZTNA) op de RDNG 3.0 backbone infrastructuur.',
+    type: 'exploration',
+    createdAt: '2026-05-15T09:00:00.000Z'
+  }
+];
+
+export const rdngProjectActivities: ProjectActivity[] = [
+  // --- RDNG 3.0 Hoofdproject ---
+  {
+    id: 'act-rdng-1',
+    projectId: 'proj-rdng-3',
+    title: 'Projectinitiatie & Architectuurkader RDNG 3.0',
+    description: 'Opstellen programma van eisen, high-level netwerkontwerp, redundantie-eisen en BIO beveiligingsrichtlijnen.',
+    startDate: '2026-05-04',
+    endDate: '2026-05-22',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: []
+  },
+  {
+    id: 'act-rdng-2',
+    projectId: 'proj-rdng-3',
+    title: 'Mijlpaal: Goedkeuring Stuurgroep & Directieakkoord',
+    description: 'Formele goedkeuring op investering en projectplanning RDNG 3.0 door regionale stuurgroep.',
+    startDate: '2026-05-25',
+    endDate: '2026-05-25',
+    status: 'completed',
+    isMilestone: true,
+    dependencies: ['act-rdng-1']
+  },
+  {
+    id: 'act-rdng-3',
+    projectId: 'proj-rdng-3',
+    title: 'Aanbesteding & Contractering Netwerkleverancier (NDIX / KPN)',
+    description: 'Contractering van dark fiber verbindingen, datacenter co-locatie en Service Level Agreements (SLA).',
+    startDate: '2026-05-26',
+    endDate: '2026-06-19',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: ['act-rdng-2']
+  },
+  {
+    id: 'act-rdng-4',
+    projectId: 'proj-rdng-3',
+    title: 'PoC Labopstelling & Core Router Configuratie',
+    description: 'Testen van failover, 10Gbps/40Gbps doorvoersnelheden en BGP-routering in testomgeving.',
+    startDate: '2026-06-22',
+    endDate: '2026-07-10',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: ['act-rdng-3']
+  },
+  {
+    id: 'act-rdng-5',
+    projectId: 'proj-rdng-3',
+    title: 'Mijlpaal: BIO Beveiligingsaudit & PoC Vrijgave',
+    description: 'Onafhankelijke security audit conform BIO/ISO27001 met positief resultaat afgerond.',
+    startDate: '2026-07-14',
+    endDate: '2026-07-14',
+    status: 'completed',
+    isMilestone: true,
+    dependencies: ['act-rdng-4']
+  },
+  {
+    id: 'act-rdng-6',
+    projectId: 'proj-rdng-3',
+    title: 'Datacenter Koppelingen & Redundante Trunks Inrichten',
+    description: 'Oplevering van redundante core switches in Datacenters Hengelo en Enschede.',
+    startDate: '2026-07-15',
+    endDate: '2026-08-14',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: ['act-rdng-5']
+  },
+  {
+    id: 'act-rdng-7',
+    projectId: 'proj-rdng-3',
+    title: 'Pilotmigratie: Eerste Deelnemende Locaties',
+    description: 'Livegang en stresstest van pilotlocatie op het nieuwe netwerk, monitoring van latency en stabiliteit.',
+    startDate: '2026-08-17',
+    endDate: '2026-09-04',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: ['act-rdng-6']
+  },
+  {
+    id: 'act-rdng-8',
+    projectId: 'proj-rdng-3',
+    title: 'Fase 1 Brede Migratie: Gemeenten Regio Twente',
+    description: 'Gefaseerde overzetting van primaire gemeentelocaties naar de nieuwe RDNG 3.0 backbone.',
+    startDate: '2026-09-07',
+    endDate: '2026-10-02',
+    status: 'in_progress',
+    isMilestone: false,
+    dependencies: ['act-rdng-7']
+  },
+  {
+    id: 'act-rdng-9',
+    projectId: 'proj-rdng-3',
+    title: 'Fase 2 Brede Migratie: Zorgpartners & GGI-Netwerk Koppeling',
+    description: 'Aansluiting van nevenlocaties, brandweer/veiligheidsregio en GGI-Netwerk routering.',
+    startDate: '2026-10-05',
+    endDate: '2026-10-30',
+    status: 'todo',
+    isMilestone: false,
+    dependencies: ['act-rdng-8']
+  },
+  {
+    id: 'act-rdng-10',
+    projectId: 'proj-rdng-3',
+    title: 'Mijlpaal: Volledige Migratie & Operationele Cutover',
+    description: 'Alle deelnemende organisaties operationeel actief op RDNG 3.0.',
+    startDate: '2026-11-04',
+    endDate: '2026-11-04',
+    status: 'todo',
+    isMilestone: true,
+    dependencies: ['act-rdng-9']
+  },
+  {
+    id: 'act-rdng-11',
+    projectId: 'proj-rdng-3',
+    title: 'Uitfasering & Decommissioning Oude RDNG 2.0 Lijnen',
+    description: 'Opzeggen en fysiek ontmantelen van legacy DSL- en glasvezelcircuits.',
+    startDate: '2026-11-05',
+    endDate: '2026-11-25',
+    status: 'todo',
+    isMilestone: false,
+    dependencies: ['act-rdng-10']
+  },
+  {
+    id: 'act-rdng-12',
+    projectId: 'proj-rdng-3',
+    title: 'Eindevaluatie, Beheeroverdracht & Decharge',
+    description: 'Overdracht van beheerdocumentatie aan operationele servicedesk en formele decharge van projectteam.',
+    startDate: '2026-11-26',
+    endDate: '2026-12-10',
+    status: 'todo',
+    isMilestone: false,
+    dependencies: ['act-rdng-11']
+  },
+
+  // --- RDNG 3.0 Verkenning SD-WAN ---
+  {
+    id: 'act-exp-1',
+    projectId: 'proj-rdng-exp',
+    title: 'Marktoriëntatie & Vendor Assessment SD-WAN',
+    description: 'Vergelijking van leveranciers voor SD-WAN koppelingen en hybride cloud ontsluiting.',
+    startDate: '2026-08-03',
+    endDate: '2026-08-28',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: []
+  },
+  {
+    id: 'act-exp-2',
+    projectId: 'proj-rdng-exp',
+    title: 'Architectuurschets Zero Trust Network Access (ZTNA)',
+    description: 'Definiëren van identiteitsgebaseerde netwerksegmentatie en veilige toegang op afstand.',
+    startDate: '2026-09-01',
+    endDate: '2026-09-25',
+    status: 'in_progress',
+    isMilestone: false,
+    dependencies: ['act-exp-1']
+  },
+  {
+    id: 'act-exp-3',
+    projectId: 'proj-rdng-exp',
+    title: 'Adviesrapport & Business Case voor Stuurgroep',
+    description: 'Opleveren eindrapportage met kosten, baten en advies voor fase 2 van RDNG 3.0.',
+    startDate: '2026-09-28',
+    endDate: '2026-10-16',
+    status: 'todo',
+    isMilestone: false,
+    dependencies: ['act-exp-2']
+  },
+
+  // --- Regionaal Knooppunt 2.0 ---
+  {
+    id: 'act-rk-1',
+    projectId: 'proj-rk-2',
+    title: 'Architectuurkader & Beveiligingsontwerp RK 2.0',
+    description: 'Vaststellen van het high-availability ontwerp, DMZ routering, BIO-beveiligingsmaatregelen en redundantie-eisen.',
+    startDate: '2026-05-18',
+    endDate: '2026-06-12',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: []
+  },
+  {
+    id: 'act-rk-2',
+    projectId: 'proj-rk-2',
+    title: 'Mijlpaal: Goedkeuring Beveiligings- & Ketenarchitectuur',
+    description: 'Formeel akkoord op het informatiebeveiligingsplan en de netwerkzonering voor het regionale knooppunt.',
+    startDate: '2026-06-15',
+    endDate: '2026-06-15',
+    status: 'completed',
+    isMilestone: true,
+    dependencies: ['act-rk-1']
+  },
+  {
+    id: 'act-rk-3',
+    projectId: 'proj-rk-2',
+    title: 'Inrichting Next-Gen Firewalls & Redundante Knooppunt Cluster',
+    description: 'Plaatsing, bekabeling en clustering van de nieuwe firewall- en routeringsinfrastructuur in datacenter Hengelo.',
+    startDate: '2026-06-16',
+    endDate: '2026-07-10',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: ['act-rk-2']
+  },
+  {
+    id: 'act-rk-4',
+    projectId: 'proj-rk-2',
+    title: 'Inrichten Digikoppeling WUS/EBMS & Landelijke Ketenverbindingen',
+    description: 'Configuratie van de koppelvlakken voor GGI-Netwerk, Suwinet, BRP bevragingen en Justid.',
+    startDate: '2026-07-13',
+    endDate: '2026-08-07',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: ['act-rk-3']
+  },
+  {
+    id: 'act-rk-5',
+    projectId: 'proj-rk-2',
+    title: 'Mijlpaal: Pre-productie Ketenintegratietest Geslaagd',
+    description: 'Succesvolle validatie van versleutelde ketenberichten en routering via het nieuwe knooppunt.',
+    startDate: '2026-08-14',
+    endDate: '2026-08-14',
+    status: 'completed',
+    isMilestone: true,
+    dependencies: ['act-rk-4']
+  },
+  {
+    id: 'act-rk-6',
+    projectId: 'proj-rk-2',
+    title: 'Migratie Koppelvlakken Deelnemende Gemeenten naar RK 2.0',
+    description: 'Gefaseerde overschakeling van gemeentelijke endpoints (Enschede, Hengelo, Almelo en overige partners).',
+    startDate: '2026-08-17',
+    endDate: '2026-09-25',
+    status: 'in_progress',
+    isMilestone: false,
+    dependencies: ['act-rk-5']
+  },
+  {
+    id: 'act-rk-7',
+    projectId: 'proj-rk-2',
+    title: 'Failover & Fall-back Stresstest Redundante Cluster',
+    description: 'Gecontroleerde simulatie van uitval primaire datacenterlocatie en automatische failover test.',
+    startDate: '2026-09-28',
+    endDate: '2026-10-14',
+    status: 'todo',
+    isMilestone: false,
+    dependencies: ['act-rk-6']
+  },
+  {
+    id: 'act-rk-8',
+    projectId: 'proj-rk-2',
+    title: 'Mijlpaal: Definitieve Livegang & Oplevering RK 2.0',
+    description: 'Alle regionale gegevensuitwisseling verloopt stabiel en gecertificeerd via Regionaal Knooppunt 2.0.',
+    startDate: '2026-10-20',
+    endDate: '2026-10-20',
+    status: 'todo',
+    isMilestone: true,
+    dependencies: ['act-rk-7']
+  },
+  {
+    id: 'act-rk-9',
+    projectId: 'proj-rk-2',
+    title: 'Uitfasering & Ontmanteling Regionaal Knooppunt 1.0',
+    description: 'Deactiveren van legacy firewall rules, oude proxy routing en ontmanteling fysieke servers.',
+    startDate: '2026-10-21',
+    endDate: '2026-11-13',
+    status: 'todo',
+    isMilestone: false,
+    dependencies: ['act-rk-8']
+  },
+
+  // --- Vervanging PKI overheid certificaten ---
+  {
+    id: 'act-pki-1',
+    projectId: 'proj-pki-cert',
+    title: 'Inventarisatie & Audit Verloopdata PKIoverheid Certificaten',
+    description: 'Volledige audit van alle private en publieke PKIoverheid certificaten, domeinen, TLS endpoints en koppelvlakken.',
+    startDate: '2026-06-08',
+    endDate: '2026-06-26',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: []
+  },
+  {
+    id: 'act-pki-2',
+    projectId: 'proj-pki-cert',
+    title: 'Aanvraag & Validatie Nieuwe G3/G4 Certificaten bij CSP',
+    description: 'Aanvraagtraject bij KPN / QuoVadis inclusief eHerkenning validatie, bevoegdheidsverklaringen en CSR generatie.',
+    startDate: '2026-06-29',
+    endDate: '2026-07-17',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: ['act-pki-1']
+  },
+  {
+    id: 'act-pki-3',
+    projectId: 'proj-pki-cert',
+    title: 'Mijlpaal: Levering & Cryptografische Sleutelverificatie',
+    description: 'Alle nieuwe PKIoverheid certificaten conform Logius standaarden en private keys veilig opgeslagen in HSM.',
+    startDate: '2026-07-20',
+    endDate: '2026-07-20',
+    status: 'completed',
+    isMilestone: true,
+    dependencies: ['act-pki-2']
+  },
+  {
+    id: 'act-pki-4',
+    projectId: 'proj-pki-cert',
+    title: 'Installatie Testomgevingen & Truststore/Keystore Update',
+    description: 'Implementatie op OTAP-testomgevingen, import van root- en intermediate CA certificaten in Java keystores.',
+    startDate: '2026-07-21',
+    endDate: '2026-08-14',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: ['act-pki-3']
+  },
+  {
+    id: 'act-pki-5',
+    projectId: 'proj-pki-cert',
+    title: 'Gefaseerde Productie-uitrol op Reverse Proxies & API Gateways',
+    description: 'Vervanging van TLS/SSL servercertificaten op publieke portals, Digikoppeling adapters en webservers.',
+    startDate: '2026-08-17',
+    endDate: '2026-09-11',
+    status: 'completed',
+    isMilestone: false,
+    dependencies: ['act-pki-4']
+  },
+  {
+    id: 'act-pki-6',
+    projectId: 'proj-pki-cert',
+    title: 'Ketenvalidatie met Landelijke Koepels (Logius, Suwinet, CORV)',
+    description: 'Controle van wederzijdse TLS authenticatie (mTLS) en foutloze berichtuitwisseling met overheidsdiensten.',
+    startDate: '2026-09-14',
+    endDate: '2026-09-25',
+    status: 'in_progress',
+    isMilestone: false,
+    dependencies: ['act-pki-5']
+  },
+  {
+    id: 'act-pki-7',
+    projectId: 'proj-pki-cert',
+    title: 'Mijlpaal: Volledige Transitie & Decharge PKIoverheid Keten',
+    description: 'Alle 100% operationele endpoints werken op de nieuwe PKIoverheid certificaten zonder verstoringen.',
+    startDate: '2026-09-30',
+    endDate: '2026-09-30',
+    status: 'todo',
+    isMilestone: true,
+    dependencies: ['act-pki-6']
+  },
+  {
+    id: 'act-pki-8',
+    projectId: 'proj-pki-cert',
+    title: 'Intrekken (Revocation) & Sanering Oude Certificaten',
+    description: 'Gecontroleerd intrekken van verlopen certificaten bij de CSP en archivering van certificaatdossiers.',
+    startDate: '2026-10-01',
+    endDate: '2026-10-12',
+    status: 'todo',
+    isMilestone: false,
+    dependencies: ['act-pki-7']
+  }
+];
+
+export const rdngTasks: Task[] = [];
+
+export const rdngTickets: Ticket[] = [
+  {
+    id: 't-rdng-101',
+    seqId: '2026-08-0015',
+    title: 'RDNG 3.0: Core trunk koppeling Datacenter Hengelo oplevering',
+    description: 'Oplevering en redundantietest van de primaire 10Gbps glasvezeltrunk in Datacenter Hengelo voor RDNG 3.0.',
+    categoryId: 'tc-rdng',
+    statusId: 'ts-gereed',
+    reporterName: 'Aldo Spit',
+    reporterOrg: 'Regio Twente ICT',
+    reporterEmail: 'aldospit@gmail.com',
+    reporterPhone: '053-4876500',
+    assignedHandlers: ['th-1', 'th-2'],
+    resolution: 'Trunkverbinding getest met NDIX. Bit-error rate test 24 uur foutloos doorstaan.',
+    createdAt: '2026-08-10T08:30:00.000Z',
+    updatedAt: '2026-08-12T16:00:00.000Z'
+  },
+  {
+    id: 't-rdng-102',
+    seqId: '2026-09-0022',
+    title: 'RDNG 3.0: Aanvraag BGP Peering en routingtabel Gemeente Enschede',
+    description: 'Configuratie en activatie van het BGP peering profiel op de nieuwe RDNG 3.0 routering voor doorgifte van interne subnetten.',
+    categoryId: 'tc-rdng',
+    statusId: 'ts-inbehandeling',
+    reporterName: 'Mark van Dijk',
+    reporterOrg: 'Gemeente Enschede',
+    reporterEmail: 'm.vandijk@enschede.nl',
+    reporterPhone: '053-4818181',
+    assignedHandlers: ['th-1'],
+    resolution: 'ASN en peering IP-adressen uitgewisseld. Testroute geadverteerd.',
+    createdAt: '2026-09-08T09:15:00.000Z',
+    updatedAt: '2026-09-14T11:20:00.000Z'
+  },
+  {
+    id: 't-rdng-103',
+    seqId: '2026-09-0029',
+    title: 'RDNG 3.0: Voorbereiding migratie Vaste Posten & Nevenlocaties',
+    description: 'Inventarisatie van nevenlocaties en controle van de lokale switches voorafgaand aan de geplande RDNG 3.0 cluster-migratie.',
+    categoryId: 'tc-rdng',
+    statusId: 'ts-ontvangen',
+    reporterName: 'Karin Berends',
+    reporterOrg: 'Regio Twente',
+    reporterEmail: 'k.berends@twente.nl',
+    reporterPhone: '06-87654321',
+    assignedHandlers: ['th-2'],
+    createdAt: '2026-09-15T14:00:00.000Z',
+    updatedAt: '2026-09-15T14:00:00.000Z'
+  },
+  {
+    id: 't-rk-101',
+    seqId: '2026-09-0035',
+    title: 'Regionaal Knooppunt 2.0: Firewall policy configuratie koppelvlak Gemeente Hengelo',
+    description: 'Inregelen van de nieuwe Next-Gen firewall regels op RK 2.0 voor de uitwisseling van gemeentelijke VTH- en BRP-koppelingen.',
+    categoryId: 'tc-rk',
+    statusId: 'ts-inbehandeling',
+    reporterName: 'Peter Bos',
+    reporterOrg: 'Gemeente Hengelo',
+    reporterEmail: 'p.bos@hengelo.nl',
+    reporterPhone: '074-2459888',
+    assignedHandlers: ['th-1'],
+    resolution: 'Regels ingeregeld in staging zone. Klaar voor ketentest.',
+    createdAt: '2026-09-12T10:00:00.000Z',
+    updatedAt: '2026-09-15T16:30:00.000Z'
+  },
+  {
+    id: 't-rk-102',
+    seqId: '2026-09-0038',
+    title: 'Regionaal Knooppunt 2.0: Digikoppeling WUS endpoint failover test',
+    description: 'Stresstest en automatische failover validatie van het redundante knooppunt cluster tussen Datacenter Enschede en Hengelo.',
+    categoryId: 'tc-rk',
+    statusId: 'ts-gereed',
+    reporterName: 'Jan-Willem de Groot',
+    reporterOrg: 'IT Platform Twente',
+    reporterEmail: 'jw.degroot@itpt.nl',
+    reporterPhone: '053-4876501',
+    assignedHandlers: ['th-2'],
+    resolution: 'Failover succesvol afgerond binnen 2,4 seconden zonder sessieverlies.',
+    createdAt: '2026-09-10T13:00:00.000Z',
+    updatedAt: '2026-09-11T11:45:00.000Z'
+  },
+  {
+    id: 't-pki-101',
+    seqId: '2026-08-0042',
+    title: 'Vervanging PKI overheid certificaten: Aanvraag nieuw Digikoppeling TLS certificaat',
+    description: 'Aanvraag van het nieuwe G3 private services servercertificaat via KPN CSP voor de regionale Digikoppeling gateway.',
+    categoryId: 'tc-algemeen',
+    statusId: 'ts-gereed',
+    reporterName: 'Aldo Spit',
+    reporterOrg: 'Regio Twente ICT',
+    reporterEmail: 'aldospit@gmail.com',
+    reporterPhone: '053-4876500',
+    assignedHandlers: ['th-1'],
+    resolution: 'Certificaat uitgeleverd door CSP, CSR geverifieerd en certificaat opgeslagen in veilige sleutelkluis.',
+    createdAt: '2026-08-20T09:00:00.000Z',
+    updatedAt: '2026-08-25T14:10:00.000Z'
+  },
+  {
+    id: 't-pki-102',
+    seqId: '2026-09-0044',
+    title: 'Vervanging PKI overheid: Certificaat vernieuwing SSO TwenteCloud ADFS/SAML',
+    description: 'Vervangen van het signing- en decryptiecertificaat voor de regionale Single Sign-On (SSO) federatie.',
+    categoryId: 'tc-sso',
+    statusId: 'ts-inbehandeling',
+    reporterName: 'Anja Scholten',
+    reporterOrg: 'Gemeente Almelo',
+    reporterEmail: 'a.scholten@almelo.nl',
+    reporterPhone: '0546-541111',
+    assignedHandlers: ['th-1', 'th-2'],
+    createdAt: '2026-09-14T11:00:00.000Z',
+    updatedAt: '2026-09-15T09:40:00.000Z'
+  }
+];
+
+export const RDNG_BACKUP_PAYLOAD: BackupDataPayload = {
+  version: 2,
+  exportedAt: new Date().toISOString(),
+  appName: 'IT Platform Twente - RDNG 3.0, Regionaal Knooppunt 2.0 & PKI overheid projecten',
+  sourceOrigin: typeof window !== 'undefined' ? window.location.origin : 'https://itpt.nl',
+  data: {
+    projects: rdngProjects,
+    projectActivities: rdngProjectActivities,
+    tasks: rdngTasks,
+    tickets: rdngTickets,
+    taskStatuses: [
+      { id: 'status-todo', name: 'Nog te doen', color: 'slate', order: 0 },
+      { id: 'status-gepland', name: 'Ingepland', color: 'blue', order: 1 },
+      { id: 'status-gereed', name: 'Gereed', color: 'emerald', order: 2 }
+    ],
+    taskCategories: [
+      { id: 'cat-werk', name: 'Werk', color: 'indigo' },
+      { id: 'cat-persoonlijk', name: 'Persoonlijk', color: 'emerald' },
+      { id: 'cat-huishouden', name: 'Huishouden', color: 'amber' },
+      { id: 'cat-hobby', name: 'Hobby', color: 'rose' }
+    ],
+    ticketCategories: [
+      { id: 'tc-rdng', name: 'RDNG' },
+      { id: 'tc-rk', name: 'Regionaal Knooppunt' },
+      { id: 'tc-sso', name: 'SSO-TwenteCloud' },
+      { id: 'tc-kpm', name: 'KPN Password Manager' },
+      { id: 'tc-ggi', name: 'GGI-Netwerk' },
+      { id: 'tc-internet', name: 'Internet' },
+      { id: 'tc-ndix', name: 'NDIX' },
+      { id: 'tc-algemeen', name: 'Algemeen' }
+    ],
+    ticketStatuses: [
+      { id: 'ts-ontvangen', name: 'Ontvangen', color: 'slate' },
+      { id: 'ts-inbehandeling', name: 'In behandeling', color: 'indigo' },
+      { id: 'ts-gereed', name: 'Gereed', color: 'emerald' },
+      { id: 'ts-gesloten', name: 'Gesloten', color: 'slate' },
+      { id: 'ts-onhold', name: 'On hold', color: 'amber' },
+      { id: 'ts-wachtmelder', name: 'Wacht op reactie melder', color: 'rose' },
+      { id: 'ts-wachtexterne', name: 'Wacht op reactie externe partij', color: 'violet' }
+    ],
+    ticketHandlers: [
+      { id: 'th-1', name: 'Aldo Spit', email: 'aldospit@gmail.com' },
+      { id: 'th-2', name: 'Jan-Willem de Groot', email: 'jw.degroot@itpt.nl' },
+      { id: 'th-3', name: 'Support Desk', email: 'support@itpt.nl' }
+    ],
+    ticketComments: [
+      {
+        id: 'tc-rdng-comm-1',
+        ticketId: 't-rdng-101',
+        authorName: 'Aldo Spit',
+        authorEmail: 'aldospit@gmail.com',
+        message: 'Trunk tests zijn succesvol afgerond conform afsprakenkader met NDIX.',
+        timestamp: '2026-08-11T14:30:00.000Z',
+        isPrivate: false
+      }
+    ]
+  }
+};

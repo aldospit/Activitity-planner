@@ -1,0 +1,235 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reuseable primitives
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function pollExists(pollId) {
+      return exists(/databases/$(database)/documents/polls/$(pollId));
+    }
+
+    // Verification helpers
+    function isValidPoll(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 200
+        && (!('description' in data) || (data.description is string && data.description.size() <= 2000))
+        && (!('options' in data) || (data.options is list && data.options.size() <= 100))
+        && data.createdAt is string
+        && (!('sentAt' in data) || data.sentAt == null || data.sentAt is string)
+        && (!('finalizedOptionId' in data) || data.finalizedOptionId == null || data.finalizedOptionId is string)
+        && (!('invitationTemplate' in data) || (data.invitationTemplate is string && data.invitationTemplate.size() <= 5000))
+        && (!('confirmationTemplate' in data) || (data.confirmationTemplate is string && data.confirmationTemplate.size() <= 5000))
+        && (!('ownerId' in data) || data.ownerId == null || (data.ownerId is string && data.ownerId.size() <= 128))
+        && (!('locationType' in data) || data.locationType is string)
+        && (!('locationAddress' in data) || data.locationAddress is string);
+    }
+
+    function isValidInvitee(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.pollId is string && data.pollId.size() <= 128
+        && (!('firstName' in data) || (data.firstName is string && data.firstName.size() <= 100))
+        && (!('lastName' in data) || (data.lastName is string && data.lastName.size() <= 100))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 150))
+        && (!('votes' in data) || data.votes is map)
+        && (!('comment' in data) || (data.comment is string && data.comment.size() <= 2000))
+        && (!('votedAt' in data) || data.votedAt == null || data.votedAt is string)
+        && (!('lastReminderAt' in data) || data.lastReminderAt == null || data.lastReminderAt is string)
+        && (!('ownerId' in data) || data.ownerId == null || (data.ownerId is string && data.ownerId.size() <= 128))
+        && (!('optionComments' in data) || data.optionComments is map);
+    }
+
+    function isValidContact(data) {
+      return data.id is string && data.id.size() <= 128
+        && (!('firstName' in data) || (data.firstName is string && data.firstName.size() <= 100))
+        && (!('lastName' in data) || (data.lastName is string && data.lastName.size() <= 100))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 150))
+        && (!('organization' in data) || (data.organization is string && data.organization.size() <= 200))
+        && (!('ownerId' in data) || data.ownerId == null || (data.ownerId is string && data.ownerId.size() <= 128));
+    }
+
+    function isValidNotification(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.pollId is string && data.pollId.size() <= 128
+        && (!('pollTitle' in data) || (data.pollTitle is string && data.pollTitle.size() <= 200))
+        && (!('inviteeName' in data) || (data.inviteeName is string && data.inviteeName.size() <= 200))
+        && (!('message' in data) || (data.message is string && data.message.size() <= 2000))
+        && (!('type' in data) || (data.type is string && (data.type == 'vote_submitted' || data.type == 'comment_added')))
+        && (!('timestamp' in data) || data.timestamp is string)
+        && (!('read' in data) || data.read is bool)
+        && (!('ownerId' in data) || data.ownerId == null || (data.ownerId is string && data.ownerId.size() <= 128));
+    }
+
+    function isValidTask(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.title is string && data.title.size() <= 300
+        && (!('description' in data) || (data.description is string && data.description.size() <= 2000))
+        && data.startDate is string && data.startDate.size() <= 30
+        && (!('endDate' in data) || data.endDate == null || (data.endDate is string && data.endDate.size() <= 30))
+        && (!('completed' in data) || data.completed is bool)
+        && (!('archived' in data) || data.archived is bool)
+        && (!('priority' in data) || data.priority is bool)
+        && (!('statusId' in data) || (data.statusId is string && data.statusId.size() <= 128))
+        && (!('categoryId' in data) || (data.categoryId is string && data.categoryId.size() <= 128))
+        && (!('isCalendarItem' in data) || data.isCalendarItem is bool)
+        && (!('startTime' in data) || data.startTime == null || (data.startTime is string && data.startTime.size() <= 20))
+        && (!('endTime' in data) || data.endTime == null || (data.endTime is string && data.endTime.size() <= 20))
+        && (!('recurrence' in data) || (data.recurrence is string && data.recurrence.size() <= 50))
+        && (!('recurrenceDay' in data) || data.recurrenceDay == null || data.recurrenceDay is int || data.recurrenceDay is number)
+        && (!('recurrenceExceptions' in data) || data.recurrenceExceptions is list)
+        && data.ownerId is string && data.ownerId.size() <= 128;
+    }
+
+    function isValidTaskStatus(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.color is string && data.color.size() <= 100
+        && (!('order' in data) || data.order is int || data.order is number)
+        && data.ownerId is string && data.ownerId.size() <= 128;
+    }
+
+    function isValidTaskCategory(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.color is string && data.color.size() <= 100
+        && data.ownerId is string && data.ownerId.size() <= 128;
+    }
+
+    function isValidCalendarCategory(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.color is string && data.color.size() <= 100
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1000))
+        && data.ownerId is string && data.ownerId.size() <= 128;
+    }
+
+    function isValidYearEvent(data) {
+      return data.id is string && data.id.size() <= 128
+        && (!('year' in data) || data.year is int || data.year is number)
+        && data.title is string && data.title.size() <= 200
+        && (!('description' in data) || (data.description is string && data.description.size() <= 2000))
+        && (!('categoryId' in data) || (data.categoryId is string && data.categoryId.size() <= 128))
+        && data.date is string && data.date.size() <= 30
+        && (!('type' in data) || (data.type is string && (data.type == 'one_time' || data.type == 'periodic')))
+        && data.ownerId is string && data.ownerId.size() <= 128;
+    }
+
+    // 2. Polls Collection rules
+    match /polls/{pollId} {
+      allow read, list, write: if true;
+    }
+
+    // 3. Invitees Collection rules
+    match /invitees/{inviteeId} {
+      allow read, list, write: if true;
+    }
+
+    // 4. Contacts Collection rules
+    match /contacts/{contactId} {
+      allow read, list, write: if true;
+    }
+
+    // 5. Notifications Collection rules
+    match /notifications/{notificationId} {
+      allow read, list, write: if true;
+    }
+
+    // 6. Weekplanner Tasks Collection rules
+    match /tasks/{taskId} {
+      allow read, list, write: if true;
+    }
+
+    // 7. Weekplanner Statuses Collection rules
+    match /task_statuses/{statusId} {
+      allow read, list, write: if true;
+    }
+
+    // 8. Weekplanner Categories Collection rules
+    match /task_categories/{categoryId} {
+      allow read, list, write: if true;
+    }
+
+    // 9. Calendar Categories Collection rules
+    match /calendar_categories/{categoryId} {
+      allow read, list, write: if true;
+    }
+
+    // 10. Year Events Collection rules
+    match /year_events/{eventId} {
+      allow read, list, write: if true;
+    }
+
+    // 11. Test connection rules
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // 12. ITPT Servicedesk Rules
+    match /ticket_categories/{id} {
+      allow read, write: if true;
+    }
+    match /ticket_statuses/{id} {
+      allow read, write: if true;
+    }
+    match /ticket_handlers/{id} {
+      allow read, write: if true;
+    }
+    match /tickets/{id} {
+      allow read, write: if true;
+    }
+    match /ticket_comments/{id} {
+      allow read, write: if true;
+    }
+    match /email_templates/{id} {
+      allow read, write: if true;
+    }
+    match /email_logs/{id} {
+      allow read, write: if true;
+    }
+
+    // 13. Projects and Project Activities Rules
+    match /projects/{id} {
+      allow read, list, write: if true;
+    }
+    match /project_activities/{id} {
+      allow read, list, write: if true;
+    }
+
+    // 14. Shared Calendars & Events Rules
+    match /shared_calendars/{id} {
+      allow read, list, write: if true;
+    }
+    match /shared_calendar_events/{id} {
+      allow read, list, write: if true;
+    }
+
+    // 15. Meetings, Notes, Agreements & Action Items Rules
+    match /meetings/{id} {
+      allow read, list, write: if true;
+    }
+    match /meeting_agreements/{id} {
+      allow read, list, write: if true;
+    }
+    match /meeting_action_items/{id} {
+      allow read, list, write: if true;
+    }
+    match /meeting_templates/{id} {
+      allow read, list, write: if true;
+    }
+  }
+}
