@@ -21,10 +21,16 @@ import {
   SharedCalendarEvent,
   Meeting,
   MeetingAgreement,
+  MeetingNote,
   MeetingActionItem,
   ActionItemStatus,
   ActionItemRemark,
-  MeetingEmailTemplate
+  MeetingEmailTemplate,
+  VacationCalendar,
+  VacationCalendarMember,
+  VacationEntry,
+  VacationLeaveType,
+  VacationLeaveStatus
 } from '../types';
 import { formatDateString } from '../utils/dateUtils';
 import { db, auth, ensureUserSignedIn, registerPreAuthHook } from './firebase';
@@ -137,8 +143,80 @@ let cachedEmailLogs: EmailLog[] = [];
 // Meeting Cache variables
 let cachedMeetings: Meeting[] = [];
 let cachedMeetingAgreements: MeetingAgreement[] = [];
+let cachedMeetingNotes: MeetingNote[] = [];
 let cachedMeetingActionItems: MeetingActionItem[] = [];
 let cachedMeetingTemplates: MeetingEmailTemplate[] = [];
+
+// Vacation & Leave Cache variables
+let cachedVacationCalendars: VacationCalendar[] = [];
+let cachedVacationEntries: VacationEntry[] = [];
+
+// Seed Data for Vacation Calendars
+const seedVacationCalendars: VacationCalendar[] = [
+  {
+    id: 'vc-kernteam',
+    slug: 'itpt-kernteam-2026',
+    name: 'IT Platform Twente - Kernteam',
+    description: 'Vakantie-, verlof- en afwezigheidskalender voor het project- en kernteam IT Platform Twente.',
+    year: 2026,
+    department: 'Kernteam & Coördinatie',
+    color: 'indigo',
+    members: [
+      { id: 'vcm-1', contactId: 'c1', name: 'Jan Pietersen', email: 'jan.pietersen@example.com', department: 'Architectuur & Regie', color: 'indigo', yearlyAllowanceDays: 25 },
+      { id: 'vcm-2', contactId: 'c2', name: 'Anna de Vries', email: 'anna.devries@example.com', department: 'Projectmanagement', color: 'emerald', yearlyAllowanceDays: 25 },
+      { id: 'vcm-3', contactId: 'c3', name: 'Lars Bakker', email: 'lars.bakker@example.com', department: 'Infrastructuur', color: 'blue', yearlyAllowanceDays: 25 },
+      { id: 'vcm-4', contactId: 'c4', name: 'Sophie Visser', email: 'sophie.visser@example.com', department: 'Applicatiebeheer', color: 'purple', yearlyAllowanceDays: 25 }
+    ],
+    createdAt: '2026-01-05T09:00:00.000Z'
+  },
+  {
+    id: 'vc-software',
+    slug: 'software-en-innovatie-2026',
+    name: 'Afdeling Software & Innovatieteam',
+    description: 'Afwezigheid en verlofrooster voor ontwikkelaars, cloud engineers en product owners.',
+    year: 2026,
+    department: 'Software Ontwikkeling',
+    color: 'emerald',
+    members: [
+      { id: 'vcm-5', contactId: 'c5', name: 'Mark Jansen', email: 'mark.jansen@example.com', department: 'DevOps & Cloud', color: 'amber', yearlyAllowanceDays: 27 },
+      { id: 'vcm-6', contactId: 'c6', name: 'Eva Smit', email: 'eva.smit@example.com', department: 'Front-end & UX', color: 'rose', yearlyAllowanceDays: 25 }
+    ],
+    createdAt: '2026-01-10T10:30:00.000Z'
+  }
+];
+
+const seedVacationEntries: VacationEntry[] = [
+  {
+    id: 've-1',
+    calendarId: 'vc-kernteam',
+    memberId: 'vcm-1',
+    memberName: 'Jan Pietersen',
+    memberEmail: 'jan.pietersen@example.com',
+    startDate: '2026-07-13',
+    endDate: '2026-07-24',
+    dates: ['2026-07-13', '2026-07-14', '2026-07-15', '2026-07-16', '2026-07-17', '2026-07-20', '2026-07-21', '2026-07-22', '2026-07-23', '2026-07-24'],
+    type: 'vakantie',
+    status: 'bevestigd',
+    notes: 'Zomervakantie twee weken',
+    daysCount: 10,
+    createdAt: '2026-02-01T10:00:00.000Z'
+  },
+  {
+    id: 've-2',
+    calendarId: 'vc-kernteam',
+    memberId: 'vcm-2',
+    memberName: 'Anna de Vries',
+    memberEmail: 'anna.devries@example.com',
+    startDate: '2026-08-03',
+    endDate: '2026-08-14',
+    dates: ['2026-08-03', '2026-08-04', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14'],
+    type: 'vakantie',
+    status: 'bevestigd',
+    notes: 'Zomervakantie gezin',
+    daysCount: 10,
+    createdAt: '2026-02-05T11:00:00.000Z'
+  }
+];
 
 // Seed Data for Calendar Categories
 const seedCalendarCategories: CalendarCategory[] = [
@@ -507,6 +585,8 @@ const seedMeetings: Meeting[] = [];
 
 const seedMeetingAgreements: MeetingAgreement[] = [];
 
+const seedMeetingNotes: MeetingNote[] = [];
+
 const seedMeetingActionItems: MeetingActionItem[] = [];
 
 const seedMeetingTemplates: MeetingEmailTemplate[] = [
@@ -769,11 +849,16 @@ function saveToLocalStorage() {
   localStorage.setItem('local_email_templates', JSON.stringify(cachedEmailTemplates));
   localStorage.setItem('local_email_logs', JSON.stringify(cachedEmailLogs));
 
-  // Meetings, Agreements, Action Items & Email Templates
+  // Meetings, Agreements, Notes, Action Items & Email Templates
   localStorage.setItem('local_meetings', JSON.stringify(cachedMeetings));
   localStorage.setItem('local_meeting_agreements', JSON.stringify(cachedMeetingAgreements));
+  localStorage.setItem('local_meeting_notes', JSON.stringify(cachedMeetingNotes));
   localStorage.setItem('local_meeting_action_items', JSON.stringify(cachedMeetingActionItems));
   localStorage.setItem('local_meeting_templates', JSON.stringify(cachedMeetingTemplates));
+
+  // Vacation & Absence Calendars
+  localStorage.setItem('local_vacation_calendars', JSON.stringify(cachedVacationCalendars));
+  localStorage.setItem('local_vacation_entries', JSON.stringify(cachedVacationEntries));
 
   // Maintain last known good state for resilient recovery
   if (cachedProjectActivities.length > 0 || cachedProjects.length > 0 || cachedTasks.length > 0) {
@@ -841,8 +926,11 @@ function captureVaultSnapshot(reason: string): RecoverySnapshot | null {
       emailLogs: [...cachedEmailLogs],
       meetings: [...cachedMeetings],
       meetingAgreements: [...cachedMeetingAgreements],
+      meetingNotes: [...cachedMeetingNotes],
       meetingActionItems: [...cachedMeetingActionItems],
       meetingTemplates: [...cachedMeetingTemplates],
+      vacationCalendars: [...cachedVacationCalendars],
+      vacationEntries: [...cachedVacationEntries],
       customProductionUrl: localStorage.getItem('custom_production_url') || null
     };
 
@@ -1207,8 +1295,13 @@ const localEmailLogsStr = localStorage.getItem('local_email_logs');
 // Meetings
 const localMeetingsStr = localStorage.getItem('local_meetings');
 const localMeetingAgreementsStr = localStorage.getItem('local_meeting_agreements');
+const localMeetingNotesStr = localStorage.getItem('local_meeting_notes');
 const localMeetingActionItemsStr = localStorage.getItem('local_meeting_action_items');
 const localMeetingTemplatesStr = localStorage.getItem('local_meeting_templates');
+
+// Vacation & Leave
+const localVacationCalendarsStr = localStorage.getItem('local_vacation_calendars');
+const localVacationEntriesStr = localStorage.getItem('local_vacation_entries');
 
 cachedPolls = localPollsStr ? JSON.parse(localPollsStr) : [...seedPolls];
 cachedInvitees = localInviteesStr ? JSON.parse(localInviteesStr) : [...seedInvitees];
@@ -1236,8 +1329,13 @@ cachedEmailLogs = localEmailLogsStr ? JSON.parse(localEmailLogsStr) : [...seedEm
 // Meetings
 cachedMeetings = (localMeetingsStr ? JSON.parse(localMeetingsStr) : [...seedMeetings]).filter(m => m.id !== 'm-1' && m.id !== 'm-2');
 cachedMeetingAgreements = (localMeetingAgreementsStr ? JSON.parse(localMeetingAgreementsStr) : [...seedMeetingAgreements]).filter(a => !['agr-1', 'agr-2', 'agr-3'].includes(a.id));
+cachedMeetingNotes = localMeetingNotesStr ? JSON.parse(localMeetingNotesStr) : [...seedMeetingNotes];
 cachedMeetingActionItems = (localMeetingActionItemsStr ? JSON.parse(localMeetingActionItemsStr) : [...seedMeetingActionItems]).filter(a => !['act-1', 'act-2', 'act-3'].includes(a.id));
 cachedMeetingTemplates = localMeetingTemplatesStr ? JSON.parse(localMeetingTemplatesStr) : [...seedMeetingTemplates];
+
+// Vacation & Leave
+cachedVacationCalendars = localVacationCalendarsStr ? JSON.parse(localVacationCalendarsStr) : [...seedVacationCalendars];
+cachedVacationEntries = localVacationEntriesStr ? JSON.parse(localVacationEntriesStr) : [...seedVacationEntries];
 
 // Store initialization flag without forcing sample projects
 localStorage.setItem('planner_initialized_store', 'true');
@@ -1866,6 +1964,34 @@ async function setupSync(userId: string) {
   });
   activeListeners.push(unsubMeetingAgreements);
 
+  // Meeting Notes collection snapshot
+  const unsubMeetingNotes = onSnapshot(collection(db, 'meeting_notes'), (snapshot) => {
+    const firestoreNotes = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as MeetingNote));
+    const firestoreMap = new Map(firestoreNotes.map(n => [n.id, n]));
+    const unsyncedLocal = firestoreNotes.length > 0
+      ? cachedMeetingNotes.filter(n => !firestoreMap.has(n.id))
+      : cachedMeetingNotes;
+
+    if (userId) {
+      unsyncedLocal.forEach(n => {
+        setDoc(doc(db, 'meeting_notes', n.id), { ...n, ownerId: userId }).catch(err => {
+          console.error("Error syncing local meeting note to Firestore:", err);
+        });
+      });
+    }
+
+    let merged = [...firestoreNotes, ...unsyncedLocal];
+    if (merged.length === 0) {
+      merged = [...seedMeetingNotes];
+    }
+    cachedMeetingNotes = merged;
+    saveToLocalStorage();
+    notifySubscribers();
+  }, (err) => {
+    handleFirestoreError(err, OperationType.GET, 'meeting_notes');
+  });
+  activeListeners.push(unsubMeetingNotes);
+
   // Meeting Action Items collection snapshot
   const unsubMeetingActions = onSnapshot(collection(db, 'meeting_action_items'), (snapshot) => {
     const firestoreActions = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as MeetingActionItem));
@@ -1909,6 +2035,58 @@ async function setupSync(userId: string) {
     handleFirestoreError(err, OperationType.GET, 'meeting_templates');
   });
   activeListeners.push(unsubMeetingTemplates);
+
+  // Vacation Calendars collection snapshot
+  const unsubVacationCalendars = onSnapshot(collection(db, 'vacation_calendars'), (snapshot) => {
+    const firestoreCals = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as VacationCalendar));
+    const firestoreMap = new Map(firestoreCals.map(c => [c.id, c]));
+    const unsyncedLocal = cachedVacationCalendars.filter(c => !firestoreMap.has(c.id));
+
+    if (userId) {
+      unsyncedLocal.forEach(c => {
+        if (!c.id.startsWith('vc-seed-')) {
+          setDoc(doc(db, 'vacation_calendars', c.id), { ...c, ownerId: userId }).catch(() => {});
+        }
+      });
+    }
+
+    let merged = [...firestoreCals, ...unsyncedLocal];
+    if (merged.length === 0) {
+      merged = [...seedVacationCalendars];
+    }
+    cachedVacationCalendars = merged;
+    saveToLocalStorage();
+    notifySubscribers();
+  }, (err) => {
+    handleFirestoreError(err, OperationType.GET, 'vacation_calendars');
+  });
+  activeListeners.push(unsubVacationCalendars);
+
+  // Vacation Entries collection snapshot
+  const unsubVacationEntries = onSnapshot(collection(db, 'vacation_entries'), (snapshot) => {
+    const firestoreEntries = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as VacationEntry));
+    const firestoreMap = new Map(firestoreEntries.map(e => [e.id, e]));
+    const unsyncedLocal = cachedVacationEntries.filter(e => !firestoreMap.has(e.id));
+
+    if (userId) {
+      unsyncedLocal.forEach(e => {
+        if (!e.id.startsWith('ve-seed-')) {
+          setDoc(doc(db, 'vacation_entries', e.id), { ...e, ownerId: userId }).catch(() => {});
+        }
+      });
+    }
+
+    let merged = [...firestoreEntries, ...unsyncedLocal];
+    if (merged.length === 0) {
+      merged = [...seedVacationEntries];
+    }
+    cachedVacationEntries = merged;
+    saveToLocalStorage();
+    notifySubscribers();
+  }, (err) => {
+    handleFirestoreError(err, OperationType.GET, 'vacation_entries');
+  });
+  activeListeners.push(unsubVacationEntries);
 }
 
 // Initial session auth sign-in guarantee
@@ -2159,6 +2337,10 @@ export const dbService = {
     return cachedInvitees.filter(i => i.pollId === pollId);
   },
 
+  getInvitees(): Invitee[] {
+    return [...cachedInvitees];
+  },
+
   getInvitee(id: string): Invitee | null {
     return cachedInvitees.find(i => i.id === id) || null;
   },
@@ -2369,6 +2551,63 @@ export const dbService = {
     }
   },
 
+  async logNotification(note: Omit<Notification, 'id' | 'timestamp' | 'read'> & { id?: string; read?: boolean; timestamp?: string }): Promise<void> {
+    const id = note.id || ('n-' + Math.random().toString(36).substr(2, 9));
+    const newNote: Notification = {
+      ...note,
+      id,
+      timestamp: note.timestamp || new Date().toISOString(),
+      read: note.read !== undefined ? note.read : true
+    };
+
+    cachedNotifications = [newNote, ...cachedNotifications];
+    saveToLocalStorage();
+    notifySubscribers();
+
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+
+    try {
+      await setDoc(doc(db, 'notifications', id), {
+        ...newNote,
+        ownerId: userId
+      });
+    } catch (err) {
+      console.warn("Could not save notification to Firestore:", err);
+    }
+  },
+
+  async deleteNotification(id: string): Promise<void> {
+    cachedNotifications = cachedNotifications.filter(n => n.id !== id);
+    saveToLocalStorage();
+    notifySubscribers();
+
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+    try {
+      await deleteDoc(doc(db, 'notifications', id));
+    } catch (err) {
+      console.warn("Could not delete notification from Firestore:", err);
+    }
+  },
+
+  async clearAllNotifications(): Promise<void> {
+    const ids = cachedNotifications.map(n => n.id);
+    cachedNotifications = [];
+    saveToLocalStorage();
+    notifySubscribers();
+
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+    try {
+      for (const id of ids) {
+        await deleteDoc(doc(db, 'notifications', id)).catch(() => {});
+      }
+    } catch (err) {
+      console.warn("Could not clear all notifications from Firestore:", err);
+    }
+  },
+
   // Weekplanner Tasks API
   getTasks(): Task[] {
     return [...cachedTasks];
@@ -2430,6 +2669,92 @@ export const dbService = {
       console.warn("Clean sample tasks firestore sync warning:", e);
     }
     return removedCount;
+  },
+
+  async archiveCompletedTasks(): Promise<number> {
+    const userId = auth.currentUser?.uid;
+    const nowIso = new Date().toISOString();
+    let count = 0;
+
+    cachedTasks = cachedTasks.map(t => {
+      // Completed, done, or marked as gereed
+      const isDone = t.completed || t.statusId.toLowerCase().includes('gereed') || t.statusId.toLowerCase().includes('done');
+      if (isDone && !t.archived) {
+        count++;
+        const updated: Task = {
+          ...t,
+          archived: true,
+          completed: true,
+          completedAt: t.completedAt || nowIso,
+          updatedAt: nowIso
+        };
+        if (userId && !SEED_IDS.has(t.id)) {
+          setDoc(doc(db, 'tasks', t.id), { ...updated, ownerId: userId }).catch(() => {});
+        }
+        return updated;
+      }
+      return t;
+    });
+
+    saveToLocalStorage();
+    notifySubscribers();
+    return count;
+  },
+
+  getArchivedTasks(): Task[] {
+    return cachedTasks.filter(t => t.archived === true);
+  },
+
+  async restoreArchivedTask(id: string): Promise<void> {
+    const userId = auth.currentUser?.uid;
+    const nowIso = new Date().toISOString();
+    const task = cachedTasks.find(t => t.id === id);
+    if (!task) return;
+
+    const updated: Task = {
+      ...task,
+      archived: false,
+      updatedAt: nowIso
+    };
+
+    const idx = cachedTasks.findIndex(t => t.id === id);
+    if (idx > -1) {
+      cachedTasks[idx] = updated;
+    }
+    saveToLocalStorage();
+    notifySubscribers();
+
+    if (userId && !SEED_IDS.has(id)) {
+      try {
+        await setDoc(doc(db, 'tasks', id), { ...updated, ownerId: userId });
+      } catch (err) {
+        console.warn("Error restoring archived task:", err);
+      }
+    }
+  },
+
+  async deleteArchivedTask(id: string): Promise<void> {
+    return this.deleteTask(id);
+  },
+
+  async deleteAllArchivedTasks(): Promise<number> {
+    const userId = auth.currentUser?.uid;
+    const archivedIds = cachedTasks.filter(t => t.archived === true).map(t => t.id);
+    const count = archivedIds.length;
+    if (count === 0) return 0;
+
+    cachedTasks = cachedTasks.filter(t => !t.archived);
+    saveToLocalStorage();
+    notifySubscribers();
+
+    if (userId) {
+      for (const id of archivedIds) {
+        if (!SEED_IDS.has(id)) {
+          deleteDoc(doc(db, 'tasks', id)).catch(() => {});
+        }
+      }
+    }
+    return count;
   },
 
   // Task Statuses API
@@ -3317,8 +3642,9 @@ export const dbService = {
 
   async deleteMeeting(id: string): Promise<void> {
     cachedMeetings = cachedMeetings.filter(m => m.id !== id);
-    // Also remove associated agreements and action items
+    // Also remove associated agreements, notes and action items
     cachedMeetingAgreements = cachedMeetingAgreements.filter(a => a.meetingId !== id);
+    cachedMeetingNotes = cachedMeetingNotes.filter(n => n.meetingId !== id);
     cachedMeetingActionItems = cachedMeetingActionItems.filter(act => act.meetingId !== id);
     saveToLocalStorage();
     notifySubscribers();
@@ -3371,6 +3697,50 @@ export const dbService = {
       await deleteDoc(doc(db, 'meeting_agreements', id));
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `meeting_agreements/${id}`);
+    }
+  },
+
+  getMeetingNotes(meetingId?: string): MeetingNote[] {
+    if (!meetingId) {
+      return [...cachedMeetingNotes];
+    }
+    return cachedMeetingNotes.filter(n => n.meetingId === meetingId);
+  },
+
+  getMeetingNoteById(id: string): MeetingNote | undefined {
+    return cachedMeetingNotes.find(n => n.id === id);
+  },
+
+  async saveMeetingNote(note: MeetingNote): Promise<void> {
+    const idx = cachedMeetingNotes.findIndex(n => n.id === note.id);
+    if (idx > -1) {
+      cachedMeetingNotes[idx] = { ...note };
+    } else {
+      cachedMeetingNotes.push({ ...note });
+    }
+    saveToLocalStorage();
+    notifySubscribers();
+
+    const userId = auth.currentUser?.uid;
+    try {
+      await setDoc(doc(db, 'meeting_notes', note.id), {
+        ...note,
+        ...(userId ? { ownerId: userId } : {})
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `meeting_notes/${note.id}`);
+    }
+  },
+
+  async deleteMeetingNote(id: string): Promise<void> {
+    cachedMeetingNotes = cachedMeetingNotes.filter(n => n.id !== id);
+    saveToLocalStorage();
+    notifySubscribers();
+
+    try {
+      await deleteDoc(doc(db, 'meeting_notes', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `meeting_notes/${id}`);
     }
   },
 
@@ -3490,6 +3860,16 @@ export const dbService = {
     });
   },
 
+  subscribeToMeetingNotes(callback: (notes: MeetingNote[]) => void): () => void {
+    const trigger = () => {
+      callback([...cachedMeetingNotes]);
+    };
+    trigger();
+    return this.subscribe(() => {
+      trigger();
+    });
+  },
+
   subscribeToMeetingActionItems(callback: (items: MeetingActionItem[]) => void): () => void {
     const trigger = () => {
       callback([...cachedMeetingActionItems]);
@@ -3542,6 +3922,7 @@ export const dbService = {
         sharedCalendarEvents: [...cachedSharedCalendarEvents],
         meetings: [...cachedMeetings],
         meetingAgreements: [...cachedMeetingAgreements],
+        meetingNotes: [...cachedMeetingNotes],
         meetingActionItems: [...cachedMeetingActionItems],
         meetingTemplates: [...cachedMeetingTemplates],
         customProductionUrl: customProdUrl || null
@@ -3668,6 +4049,10 @@ export const dbService = {
       if (data.meetingAgreements) {
         cachedMeetingAgreements = processList(cachedMeetingAgreements, data.meetingAgreements, 'meetings');
       }
+      if (data.meetingNotes) {
+        cachedMeetingNotes = processList(cachedMeetingNotes, data.meetingNotes, 'meetings');
+        summary.push(`${cachedMeetingNotes.length} notities`);
+      }
       if (data.meetingActionItems) {
         cachedMeetingActionItems = processList(cachedMeetingActionItems, data.meetingActionItems, 'meetings');
         summary.push(`${cachedMeetingActionItems.length} actiepunten`);
@@ -3765,6 +4150,11 @@ export const dbService = {
               await setDoc(doc(db, 'meeting_agreements', a.id), { ...a, ownerId: userId }).catch(() => {});
             }
           }
+          if (data.meetingNotes) {
+            for (const n of data.meetingNotes) {
+              await setDoc(doc(db, 'meeting_notes', n.id), { ...n, ownerId: userId }).catch(() => {});
+            }
+          }
           if (data.meetingActionItems) {
             for (const act of data.meetingActionItems) {
               await setDoc(doc(db, 'meeting_action_items', act.id), { ...act, ownerId: userId }).catch(() => {});
@@ -3851,6 +4241,139 @@ export const dbService = {
 
   getRdng3Payload(): BackupDataPayload {
     return RDNG_BACKUP_PAYLOAD;
+  },
+
+  // --- VAKANTIE-, VERLOF- EN AFWEZIGHEIDSKALENDER API ---
+  getVacationCalendars(): VacationCalendar[] {
+    return [...cachedVacationCalendars];
+  },
+
+  getVacationCalendar(idOrSlug: string): VacationCalendar | null {
+    return cachedVacationCalendars.find(c => c.id === idOrSlug || c.slug === idOrSlug) || null;
+  },
+
+  async saveVacationCalendar(calendar: VacationCalendar): Promise<void> {
+    const userId = auth.currentUser?.uid;
+    const nowIso = new Date().toISOString();
+    const updatedCal: VacationCalendar = {
+      ...calendar,
+      updatedAt: nowIso,
+      createdAt: calendar.createdAt || nowIso
+    };
+
+    const idx = cachedVacationCalendars.findIndex(c => c.id === calendar.id);
+    if (idx > -1) {
+      cachedVacationCalendars[idx] = updatedCal;
+    } else {
+      cachedVacationCalendars.push(updatedCal);
+    }
+
+    saveToLocalStorage();
+    notifySubscribers();
+
+    if (userId) {
+      try {
+        await setDoc(doc(db, 'vacation_calendars', calendar.id), { ...updatedCal, ownerId: userId });
+      } catch (err) {
+        console.warn("Notice: Saved vacation calendar locally, cloud sync error:", err);
+      }
+    }
+  },
+
+  async deleteVacationCalendar(id: string): Promise<void> {
+    cachedVacationCalendars = cachedVacationCalendars.filter(c => c.id !== id);
+    cachedVacationEntries = cachedVacationEntries.filter(e => e.calendarId !== id);
+    saveToLocalStorage();
+    notifySubscribers();
+
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+
+    try {
+      await deleteDoc(doc(db, 'vacation_calendars', id));
+      // Delete entries in firestore
+      const entriesSnap = await getDocs(collection(db, 'vacation_entries'));
+      for (const d of entriesSnap.docs) {
+        if (d.data().calendarId === id) {
+          await deleteDoc(doc(db, 'vacation_entries', d.id)).catch(() => {});
+        }
+      }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `vacation_calendars/${id}`);
+    }
+  },
+
+  getVacationEntries(calendarId?: string): VacationEntry[] {
+    if (calendarId) {
+      return cachedVacationEntries.filter(e => e.calendarId === calendarId);
+    }
+    return [...cachedVacationEntries];
+  },
+
+  getVacationEntry(id: string): VacationEntry | null {
+    return cachedVacationEntries.find(e => e.id === id) || null;
+  },
+
+  async saveVacationEntry(entry: VacationEntry): Promise<void> {
+    const userId = auth.currentUser?.uid;
+    const nowIso = new Date().toISOString();
+    const updatedEntry: VacationEntry = {
+      ...entry,
+      updatedAt: nowIso,
+      createdAt: entry.createdAt || nowIso
+    };
+
+    const idx = cachedVacationEntries.findIndex(e => e.id === entry.id);
+    if (idx > -1) {
+      cachedVacationEntries[idx] = updatedEntry;
+    } else {
+      cachedVacationEntries.push(updatedEntry);
+    }
+
+    saveToLocalStorage();
+    notifySubscribers();
+
+    if (userId) {
+      try {
+        await setDoc(doc(db, 'vacation_entries', entry.id), { ...updatedEntry, ownerId: userId });
+      } catch (err) {
+        console.warn("Notice: Saved vacation entry locally, cloud sync error:", err);
+      }
+    }
+  },
+
+  async deleteVacationEntry(id: string): Promise<void> {
+    cachedVacationEntries = cachedVacationEntries.filter(e => e.id !== id);
+    saveToLocalStorage();
+    notifySubscribers();
+
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+
+    try {
+      await deleteDoc(doc(db, 'vacation_entries', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `vacation_entries/${id}`);
+    }
+  },
+
+  async deleteVacationEntriesForMember(calendarId: string, memberId: string): Promise<void> {
+    const toDeleteIds = cachedVacationEntries
+      .filter(e => e.calendarId === calendarId && e.memberId === memberId)
+      .map(e => e.id);
+
+    cachedVacationEntries = cachedVacationEntries.filter(
+      e => !(e.calendarId === calendarId && e.memberId === memberId)
+    );
+    saveToLocalStorage();
+    notifySubscribers();
+
+    const userId = auth.currentUser?.uid;
+    if (userId) {
+      for (const id of toDeleteIds) {
+        deleteDoc(doc(db, 'vacation_entries', id)).catch(() => {});
+      }
+    }
   }
 };
 
@@ -3882,8 +4405,11 @@ export interface BackupDataPayload {
     sharedCalendarEvents?: SharedCalendarEvent[];
     meetings?: Meeting[];
     meetingAgreements?: MeetingAgreement[];
+    meetingNotes?: MeetingNote[];
     meetingActionItems?: MeetingActionItem[];
     meetingTemplates?: MeetingEmailTemplate[];
+    vacationCalendars?: VacationCalendar[];
+    vacationEntries?: VacationEntry[];
     customProductionUrl?: string | null;
   };
 }

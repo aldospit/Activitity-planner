@@ -225,10 +225,21 @@ service cloud.firestore {
     match /meeting_agreements/{id} {
       allow read, list, write: if true;
     }
+    match /meeting_notes/{id} {
+      allow read, list, write: if true;
+    }
     match /meeting_action_items/{id} {
       allow read, list, write: if true;
     }
     match /meeting_templates/{id} {
+      allow read, list, write: if true;
+    }
+
+    // 16. Vacation & Leave Calendars Rules
+    match /vacation_calendars/{id} {
+      allow read, list, write: if true;
+    }
+    match /vacation_entries/{id} {
       allow read, list, write: if true;
     }
   }

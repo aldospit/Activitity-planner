@@ -194,6 +194,47 @@
         "dueDate": { "type": "string" }
       },
       "required": ["id", "meetingId", "title", "dueDate", "status"]
+    },
+    "vacationCalendar": {
+      "title": "VacationCalendar",
+      "description": "A vacation and absence calendar for a team, department, or organization",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "slug": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "year": { "type": "number" },
+        "department": { "type": "string" },
+        "color": { "type": "string" },
+        "members": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "name", "year", "members"]
+    },
+    "vacationEntry": {
+      "title": "VacationEntry",
+      "description": "A scheduled vacation, leave, or absence entry for a member",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "calendarId": { "type": "string" },
+        "memberId": { "type": "string" },
+        "memberName": { "type": "string" },
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "dates": { "type": "array" },
+        "type": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "daysCount": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "ownerId": { "type": "string" }
+      },
+      "required": ["id", "calendarId", "memberId", "memberName", "startDate", "endDate", "dates", "type"]
     }
   },
   "firestore": {
@@ -244,6 +285,14 @@
     "meeting_action_items": {
       "schema": "meetingActionItem",
       "description": "Action items tracked per meeting"
+    },
+    "vacation_calendars": {
+      "schema": "vacationCalendar",
+      "description": "The vacation and absence calendars"
+    },
+    "vacation_entries": {
+      "schema": "vacationEntry",
+      "description": "The vacation and leave entries per member"
     }
   }
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import ProjectPlannerMatrixTable from './ProjectPlannerMatrixTable';
 import GanttChartView from './GanttChartView';
-import { Project, ProjectActivity, ProjectType, ActivityStatus, Language, Attachment } from '../types';
+import { Project, ProjectActivity, ProjectType, ActivityStatus, Language, Attachment, Task } from '../types';
 import { dbService } from '../services/db';
 import { DataImportExportModal } from './DataImportExportModal';
 import { 
@@ -9,7 +9,7 @@ import {
   TrendingUp, Trash2, Edit2, CheckCircle, Search, Filter, 
   ChevronDown, HelpCircle, Download, Upload, AlertCircle, Play, Info, Layers, Paperclip, FileText, X,
   ListTodo, User, GripVertical, Printer, Eye, EyeOff, Globe, ChevronRight, CheckCircle2, FolderClosed, FolderOpen, Copy, ZoomIn,
-  RotateCcw, FolderKanban
+  RotateCcw, FolderKanban, CheckSquare
 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
@@ -217,11 +217,14 @@ export default function ProjectPlanner({ lang }: ProjectPlannerProps) {
     return dbActs.length > 0 ? dbActs : defaultActivities;
   });
 
+  const [tasks, setTasks] = useState<Task[]>(() => dbService.getTasks());
+
   // Subscribe to central db updates
   useEffect(() => {
     const unsub = dbService.subscribe(() => {
       setProjects(dbService.getProjects());
       setActivities(dbService.getProjectActivities());
+      setTasks(dbService.getTasks());
     });
     return () => unsub();
   }, []);
@@ -230,6 +233,46 @@ export default function ProjectPlanner({ lang }: ProjectPlannerProps) {
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     projects.length > 0 ? projects[0].id : 'all'
   );
+
+  // --- Linked Tasks from Takenoverzicht & Trello Board ---
+  const linkedTasksForProject = useMemo(() => {
+    if (!selectedProjectId || selectedProjectId === 'all') return [];
+    return tasks.filter(t => t.projectId === selectedProjectId && !t.archived);
+  }, [tasks, selectedProjectId]);
+
+  const unassignedLinkedTasks = useMemo(() => {
+    return linkedTasksForProject.filter(t => !activities.some(a => a.id === t.id || a.title.toLowerCase() === t.title.toLowerCase()));
+  }, [linkedTasksForProject, activities]);
+
+  const handlePlanTaskIntoProject = async (task: Task) => {
+    const actId = task.id.startsWith('act-') ? task.id : `act-${task.id}`;
+    const newAct: ProjectActivity = {
+      id: actId,
+      projectId: selectedProjectId,
+      title: task.title,
+      description: task.description || '',
+      startDate: task.startDate || new Date().toISOString().split('T')[0],
+      endDate: task.endDate || task.startDate || new Date().toISOString().split('T')[0],
+      status: task.completed ? 'completed' : 'todo',
+      isMilestone: false,
+      dependencies: [],
+      order: activities.filter(a => a.projectId === selectedProjectId).length,
+      assignee: task.assignees?.map(a => a.name).join(', ')
+    };
+    await dbService.saveProjectActivity(newAct);
+    await dbService.saveTask({
+      ...task,
+      activityId: actId
+    });
+    setActivities(dbService.getProjectActivities());
+  };
+
+  const handlePlanAllLinkedTasks = async () => {
+    for (const t of unassignedLinkedTasks) {
+      await handlePlanTaskIntoProject(t);
+    }
+  };
+
   const [draggedActivityId, setDraggedActivityId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -2343,6 +2386,41 @@ export default function ProjectPlanner({ lang }: ProjectPlannerProps) {
               <span>📋 {displayActivities.length} {isNl ? 'activiteiten' : 'activities'}</span>
               <span>✔️ {displayActivities.filter(a => a.status === 'completed').length} {isNl ? 'voltooid' : 'completed'}</span>
               <span>◆ {displayActivities.filter(a => a.isMilestone).length} {isNl ? 'mijlpalen' : 'milestones'}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Linked Tasks From Task Manager Banner */}
+        {unassignedLinkedTasks.length > 0 && selectedProjectId !== 'all' && (
+          <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs animate-fade-in">
+            <div className="flex items-center gap-2.5">
+              <span className="p-1.5 bg-indigo-600 text-white rounded-lg shrink-0">
+                <CheckSquare className="h-4 w-4" />
+              </span>
+              <div>
+                <div className="text-xs font-bold text-indigo-950 flex items-center gap-2">
+                  <span>
+                    {unassignedLinkedTasks.length} {isNl ? 'taak/taken gekoppeld vanuit het Takenoverzicht' : 'tasks linked from Task Board'}
+                  </span>
+                  <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-800 text-[10px] font-black rounded-full">
+                    Klaar om in te plannen
+                  </span>
+                </div>
+                <p className="text-[11px] text-indigo-700 mt-0.5 line-clamp-1">
+                  {unassignedLinkedTasks.map(t => t.title).join(' • ')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+              <button
+                onClick={handlePlanAllLinkedTasks}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                title={isNl ? 'Plan deze taken direct in op de Gantt chart en tabel van dit project' : 'Plan into Gantt chart and table'}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>{isNl ? 'Plan In op Tijdlijn (Gantt & Tabel)' : 'Plan on Timeline'}</span>
+              </button>
             </div>
           </div>
         )}

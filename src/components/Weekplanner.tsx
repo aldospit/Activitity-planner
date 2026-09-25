@@ -105,7 +105,8 @@ export default function Weekplanner({ lang }: WeekplannerProps) {
 
   // --- Load Data & Real-Time Sync Subscription ---
   const loadData = () => {
-    setTasks(dbService.getTasks());
+    const allTasks = dbService.getTasks();
+    setTasks(allTasks.filter(t => t.showInWeekPlanner !== false));
     
     const dbStatuses = dbService.getTaskStatuses();
     setStatuses(dbStatuses);

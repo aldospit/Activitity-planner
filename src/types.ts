@@ -46,16 +46,32 @@ export interface Contact {
   ownerId?: string;
 }
 
+export interface TaskProgressUpdate {
+  id: string;
+  author: string;
+  date: string; // ISO string or YYYY-MM-DD HH:mm
+  text: string;
+  statusChange?: string;
+}
+
 export interface Notification {
   id: string;
-  pollId: string;
-  pollTitle: string;
-  inviteeName: string;
+  pollId?: string;
+  pollTitle?: string;
+  inviteeName?: string;
+  title?: string;
   message: string;
-  type: 'vote_submitted' | 'comment_added';
+  type: 'vote_submitted' | 'comment_added' | 'poll_reminder' | 'meeting_prep' | 'task_reminder' | 'task_assigned' | 'group_task_reminder' | 'general' | 'agenda_prep' | 'meeting_actions';
   timestamp: string; // ISO string
   read: boolean;
   ownerId?: string;
+  recipientEmail?: string;
+  recipientName?: string;
+  recipientCount?: number;
+  itemType?: 'poll' | 'meeting' | 'task' | 'group_tasks';
+  itemId?: string;
+  uniqueUrl?: string;
+  status?: 'sent' | 'scheduled' | 'draft';
 }
 
 export interface Attachment {
@@ -85,6 +101,18 @@ export interface Task {
   recurrenceExceptions: string[]; // YYYY-MM-DD exceptions where this instance is deleted or checked off
   ownerId?: string;
   attachments?: Attachment[];
+  assigneeIds?: string[]; // Contact IDs
+  assignees?: { id: string; name: string; email: string }[];
+  showInWeekPlanner?: boolean; // Vinkje om beschikbaar te maken in Weekplanner
+  projectId?: string; // Gekoppeld aan project of verkenning
+  projectType?: 'project' | 'exploration';
+  projectTitle?: string;
+  activityId?: string; // Optioneel gekoppelde projectactiviteit
+  completedAt?: string | null;
+  notes?: string;
+  progressUpdates?: TaskProgressUpdate[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TaskStatus {
@@ -201,6 +229,7 @@ export interface ProjectActivity {
   parentId?: string;
   attachments?: Attachment[];
   assignee?: string;
+  taskId?: string; // Optioneel gekoppelde taak
 }
 
 export interface CalendarCategory {
@@ -218,10 +247,12 @@ export interface YearEvent {
   description: string;
   categoryId: string; // references CalendarCategory id
   date: string; // YYYY-MM-DD
+  endDate?: string | null; // YYYY-MM-DD or null (e.g. for multi-day periods like school vacations)
   type: 'one_time' | 'periodic';
   recurrence?: 'weekly' | 'biweekly' | 'monthly' | 'none';
   recurrenceEnd?: string | null; // YYYY-MM-DD or null
   isFeestdag?: boolean;
+  isSchoolVacation?: boolean;
   ownerId?: string;
   createdAt?: string;
 }
@@ -405,6 +436,24 @@ export interface MeetingAgreement {
   ownerId?: string;
 }
 
+export type MeetingNoteCategory = 'overlegverslag' | 'notitie' | 'bespreking' | 'aantekening' | 'rondvraag' | 'besluit';
+
+export interface MeetingNote {
+  id: string;
+  meetingId: string;
+  meetingTitle?: string;
+  title: string;
+  content: string;
+  author?: string;
+  category?: MeetingNoteCategory;
+  date: string; // YYYY-MM-DD
+  projectOrSubject?: string;
+  tags?: string[];
+  createdAt: string; // ISO string
+  updatedAt?: string; // ISO string
+  ownerId?: string;
+}
+
 export type ActionItemStatus = 'open' | 'in_behandeling' | 'gereed' | 'on_hold';
 
 export interface ActionItemRemark {
@@ -442,6 +491,48 @@ export interface MeetingEmailTemplate {
   ownerId?: string;
 }
 
+// --- Vakantie-, Verlof- en Afwezigheidskalender (Vacation & Leave Planner) ---
+export type VacationLeaveType = 'vakantie' | 'verlof' | 'compensatie' | 'bijzonder_verlof' | 'opleiding' | 'ziek' | 'overig';
+export type VacationLeaveStatus = 'bevestigd' | 'aangevraagd' | 'optie';
 
+export interface VacationCalendarMember {
+  id: string; // Member unique ID
+  contactId?: string; // Optional link to central address book Contact
+  name: string;
+  email: string;
+  department?: string;
+  color?: string; // Badge / avatar color
+  yearlyAllowanceDays?: number; // e.g. 25
+}
 
+export interface VacationCalendar {
+  id: string;
+  slug: string; // Unique URL slug/token
+  name: string; // e.g. "IT Platform Twente - Kernteam", "Afdeling Software"
+  description?: string;
+  year: number; // e.g. 2026
+  department?: string;
+  color?: string;
+  members: VacationCalendarMember[];
+  createdAt: string; // ISO string
+  updatedAt?: string; // ISO string
+  ownerId?: string;
+}
 
+export interface VacationEntry {
+  id: string;
+  calendarId: string;
+  memberId: string; // references VacationCalendarMember id
+  memberName: string;
+  memberEmail?: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  dates: string[]; // List of YYYY-MM-DD dates in the range
+  type: VacationLeaveType; // 'vakantie' | 'verlof' | 'compensatie' | 'ziek' | 'overig'
+  status: VacationLeaveStatus; // 'bevestigd' | 'aangevraagd' | 'optie'
+  notes?: string;
+  daysCount: number; // Number of days
+  createdAt: string; // ISO string
+  updatedAt?: string; // ISO string
+  ownerId?: string;
+}

@@ -59,11 +59,18 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
   const [listSortDirection, setListSortDirection] = useState<'asc' | 'desc'>('asc');
   const [saveAndClose, setSaveAndClose] = useState(true);
 
-  // Holiday management state
+  // Holiday & School Vacation management state
   const [isManagingHolidays, setIsManagingHolidays] = useState(false);
+  const [holidayDrawerTab, setHolidayDrawerTab] = useState<'holidays' | 'vacations'>('holidays');
   const [holidayTitle, setHolidayTitle] = useState('');
   const [holidayDate, setHolidayDate] = useState('');
   const [editingHolidayId, setEditingHolidayId] = useState<string | null>(null);
+
+  // School vacation form state
+  const [vacationTitle, setVacationTitle] = useState('');
+  const [vacationStartDate, setVacationStartDate] = useState('');
+  const [vacationEndDate, setVacationEndDate] = useState('');
+  const [editingVacationId, setEditingVacationId] = useState<string | null>(null);
   
   // Selected day detail modal
   const [selectedDay, setSelectedDay] = useState<{ dateStr: string; label: string } | null>(null);
@@ -73,6 +80,8 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
   const [formDesc, setFormDesc] = useState('');
   const [formCategoryId, setFormCategoryId] = useState('');
   const [formDate, setFormDate] = useState('');
+  const [formEndDate, setFormEndDate] = useState('');
+  const [formIsSchoolVacation, setFormIsSchoolVacation] = useState(false);
   const [formType, setFormType] = useState<'one_time' | 'periodic'>('one_time');
   const [formRecurrence, setFormRecurrence] = useState<'weekly' | 'biweekly' | 'monthly' | 'none'>('none');
   const [formRecurrenceEnd, setFormRecurrenceEnd] = useState('');
@@ -183,10 +192,17 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
         }
       }
 
-      // Check exact match
+      // Check exact match or multi-day period (e.g. school vacations)
       if (e.date === dateStr) {
         dayEvents.push(e);
         return;
+      }
+
+      if (e.endDate && e.endDate >= e.date) {
+        if (dateStr >= e.date && dateStr <= e.endDate) {
+          dayEvents.push(e);
+          return;
+        }
       }
 
       // Check periodic/recurring rules
@@ -315,6 +331,83 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
     return createdCount;
   };
 
+  // Dutch School Vacations Pre-Seed Data Generator
+  const generateDutchSchoolHolidays = async () => {
+    const year = selectedYear;
+
+    let vacCat = categories.find(c => c.name.toLowerCase() === 'schoolvakantie' || c.id === 'cc-schoolvakantie');
+    if (!vacCat) {
+      vacCat = {
+        id: 'cc-schoolvakantie',
+        name: 'Schoolvakantie',
+        color: 'slate'
+      };
+      await dbService.saveCalendarCategory(vacCat);
+    }
+
+    // Adviesdata schoolvakanties (Regio Noord & Midden)
+    const schoolHolidays = [
+      {
+        title: `Voorjaarsvakantie ${year}`,
+        date: `${year}-02-14`,
+        endDate: `${year}-02-22`,
+        description: 'Adviesdata schoolvakantie'
+      },
+      {
+        title: `Meivakantie ${year}`,
+        date: `${year}-04-25`,
+        endDate: `${year}-05-03`,
+        description: 'Officiële meivakantie rijksoverheid'
+      },
+      {
+        title: `Zomervakantie ${year}`,
+        date: `${year}-07-11`,
+        endDate: `${year}-08-23`,
+        description: 'Zomervakantie basisonderwijs en voortgezet onderwijs'
+      },
+      {
+        title: `Herfstvakantie ${year}`,
+        date: `${year}-10-17`,
+        endDate: `${year}-10-25`,
+        description: 'Adviesdata herfstvakantie'
+      },
+      {
+        title: `Kerstvakantie ${year}`,
+        date: `${year}-12-19`,
+        endDate: `${year + 1}-01-03`,
+        description: 'Kerstvakantie'
+      }
+    ];
+
+    let createdCount = 0;
+    for (const h of schoolHolidays) {
+      const alreadyExists = events.some(e => 
+        (e.isSchoolVacation || e.categoryId === vacCat?.id) && 
+        e.title.toLowerCase() === h.title.toLowerCase() &&
+        e.year === year
+      );
+      if (!alreadyExists) {
+        const id = 'vac-' + Math.random().toString(36).substr(2, 9);
+        const newEv: YearEvent = {
+          id,
+          year,
+          title: h.title,
+          description: h.description,
+          categoryId: vacCat.id,
+          date: h.date,
+          endDate: h.endDate,
+          type: 'one_time',
+          isSchoolVacation: true
+        };
+        await dbService.saveYearEvent(newEv);
+        createdCount++;
+      }
+    }
+
+    loadData();
+    return createdCount;
+  };
+
   // Copy Events from Previous Year
   const copyEventsFromPreviousYear = async () => {
     const prevYear = selectedYear - 1;
@@ -391,10 +484,12 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
         description: formDesc.trim(),
         categoryId: formCategoryId,
         date: formDate,
+        endDate: formEndDate ? formEndDate : null,
         type: formType,
         recurrence: formType === 'periodic' ? formRecurrence : 'none',
         recurrenceEnd: formType === 'periodic' && formRecurrenceEnd ? formRecurrenceEnd : null,
-        isFeestdag: editingEvent?.isFeestdag || false
+        isFeestdag: editingEvent?.isFeestdag || false,
+        isSchoolVacation: formIsSchoolVacation
       };
 
       await dbService.saveYearEvent(eventData);
@@ -427,6 +522,8 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
     setFormDesc('');
     setFormCategoryId(categories[0]?.id || '');
     setFormDate(`${selectedYear}-01-01`);
+    setFormEndDate('');
+    setFormIsSchoolVacation(false);
     setFormType('one_time');
     setFormRecurrence('none');
     setFormRecurrenceEnd('');
@@ -438,6 +535,8 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
     setFormDesc(ev.description || '');
     setFormCategoryId(ev.categoryId);
     setFormDate(ev.date);
+    setFormEndDate(ev.endDate || '');
+    setFormIsSchoolVacation(!!ev.isSchoolVacation);
     setFormType(ev.type);
     setFormRecurrence(ev.recurrence || 'none');
     setFormRecurrenceEnd(ev.recurrenceEnd || '');
@@ -1044,12 +1143,20 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
 
                               if (hasEvents) {
                                 const holidayEvent = dayEvents.find(e => e.isFeestdag);
+                                const schoolVacationEvent = dayEvents.find(e => e.isSchoolVacation || e.categoryId === 'cc-schoolvakantie' || (e.title && e.title.toLowerCase().includes('schoolvakantie')));
+
                                 if (holidayEvent) {
                                   // Red/sky accent for holiday
                                   cellBg = '#f0f9ff'; // sky-50
                                   cellBorder = '#0ea5e9'; // sky-500
                                   primaryBg = 'bg-sky-50 text-sky-800 font-semibold print:bg-sky-50';
                                   borderStyling = 'border-sky-300';
+                                } else if (schoolVacationEvent) {
+                                  // Gray marking & hatched lines for school vacations as requested
+                                  cellBg = '#f1f5f9';
+                                  cellBorder = '#94a3b8';
+                                  primaryBg = 'bg-slate-100 text-slate-800 font-semibold print:bg-slate-100';
+                                  borderStyling = 'border-slate-400 border-dashed';
                                 } else {
                                   // Use first custom event's category details
                                   const mainCat = categories.find(c => c.id === dayEvents[0].categoryId);
@@ -1074,6 +1181,17 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
                                 );
                               }
 
+                              const currentSchoolVacation = dayEvents.find(e => e.isSchoolVacation || e.categoryId === 'cc-schoolvakantie' || (e.title && e.title.toLowerCase().includes('schoolvakantie')));
+                              const customCellProps = currentSchoolVacation
+                                ? {
+                                    backgroundColor: '#f8fafc',
+                                    borderColor: '#94a3b8',
+                                    borderStyle: 'dashed',
+                                    borderWidth: '1px',
+                                    backgroundImage: 'repeating-linear-gradient(135deg, rgba(226,232,240,0.85), rgba(226,232,240,0.85) 4px, rgba(248,250,252,0.95) 4px, rgba(248,250,252,0.95) 8px)'
+                                  }
+                                : { backgroundColor: cellBg, borderColor: cellBorder };
+
                               return (
                                 <button
                                   key={fullDateStr}
@@ -1083,11 +1201,16 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
                                       label: day.toLocaleDateString(lang === 'nl' ? 'nl-NL' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) 
                                     });
                                   }}
-                                  style={{ backgroundColor: cellBg, borderColor: cellBorder }}
+                                  style={customCellProps}
                                   className={`relative py-1 rounded-md text-[11px] border focus:outline-none transition-all ${primaryBg} ${borderStyling} min-h-[26px] flex flex-col items-center justify-center print:min-h-[46px] print:justify-start print:items-start print:p-0.5 print:overflow-hidden`}
-                                  title={`${day.toLocaleDateString(lang === 'nl' ? 'nl-NL' : 'en-US', { day: 'numeric', month: 'short' })}: ${dayEvents.length} event(s)`}
+                                  title={`${day.toLocaleDateString(lang === 'nl' ? 'nl-NL' : 'en-US', { day: 'numeric', month: 'short' })}: ${currentSchoolVacation ? `[Schoolvakantie: ${currentSchoolVacation.title}] ` : ''}${dayEvents.length} event(s)`}
                                 >
                                   <span className="font-semibold print:text-[8px] print:leading-none print:m-0.5">{day.getDate()}</span>
+                                  {currentSchoolVacation && (
+                                    <span className="absolute top-0.5 right-0.5 text-[8px] leading-none select-none opacity-80 print:hidden" title={`Schoolvakantie: ${currentSchoolVacation.title}`}>
+                                      🎒
+                                    </span>
+                                  )}
                                   {indicatorDots}
                                   {hasEvents && (
                                     <div className="hidden print:flex flex-col gap-0.5 w-full text-left overflow-hidden text-[5.5px] leading-tight text-slate-800 font-bold max-h-[34px] mt-0.5">
@@ -1601,16 +1724,50 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
                 </select>
               </div>
 
-              {/* Date selection */}
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-1">{lang === 'nl' ? 'Startdatum' : 'Date'} *</label>
-                <input 
-                  type="date"
-                  value={formDate}
-                  onChange={e => setFormDate(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm"
-                  required
-                />
+              {/* Date & Period selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">{lang === 'nl' ? 'Startdatum' : 'Start Date'} *</label>
+                  <input 
+                    type="date"
+                    value={formDate}
+                    onChange={e => setFormDate(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1">{lang === 'nl' ? 'Einddatum (optioneel voor periode)' : 'End Date (optional)'}</label>
+                  <input 
+                    type="date"
+                    value={formEndDate}
+                    min={formDate}
+                    onChange={e => setFormEndDate(e.target.value)}
+                    className="w-full px-3.5 py-2 border border-slate-200 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* School vacation indicator checkbox */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={formIsSchoolVacation}
+                    onChange={e => setFormIsSchoolVacation(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                  />
+                  <div className="flex flex-col">
+                    <span className="flex items-center gap-1.5">
+                      <span>🎒 {lang === 'nl' ? 'Markeer als schoolvakantie' : 'Mark as School Vacation'}</span>
+                    </span>
+                    <span className="text-[11px] font-normal text-slate-500 mt-0.5">
+                      {lang === 'nl' 
+                        ? 'De dagen in deze periode worden op de jaarkalender gemarkeerd met een herkenbare grijze arcering.'
+                        : 'Days in this period will be marked with a distinctive gray hatched pattern on the calendar.'}
+                    </span>
+                  </div>
+                </label>
               </div>
 
               {/* Event Repeat configuration */}
@@ -1747,10 +1904,18 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
 
                   return (
                     <div key={ev.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 relative group">
-                      <div className="flex items-center gap-1.5 mb-1.5">
+                      <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
                         <span className={`w-2.5 h-2.5 rounded-full ${colorClasses.dot}`} />
                         <span className="text-[10px] font-bold text-slate-500 uppercase">{cat ? cat.name : 'Activiteit'}</span>
                         
+                        {/* School vacation badge */}
+                        {ev.isSchoolVacation && (
+                          <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1">
+                            <span>🎒</span>
+                            <span>{lang === 'nl' ? 'Schoolvakantie' : 'School Vacation'}</span>
+                          </span>
+                        )}
+
                         {/* Periodic info */}
                         {ev.type === 'periodic' && (
                           <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-[9px] font-semibold">
@@ -1760,6 +1925,11 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
                       </div>
 
                       <h5 className="font-bold text-slate-900 text-sm">{ev.title}</h5>
+                      {ev.endDate && ev.endDate !== ev.date && (
+                        <p className="text-[11px] font-mono text-slate-600 mt-0.5">
+                          📅 {lang === 'nl' ? `Periode: ${ev.date} t/m ${ev.endDate}` : `Period: ${ev.date} to ${ev.endDate}`}
+                        </p>
+                      )}
                       {ev.description && (
                         <p className="text-slate-500 text-xs mt-1 leading-relaxed">{ev.description}</p>
                       )}
@@ -1963,17 +2133,18 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
         </div>
       )}
 
-      {/* Holiday Management Side Drawer Panel */}
+      {/* Holiday & School Vacation Management Side Drawer Panel */}
       {isManagingHolidays && !isPublicShared && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-end p-0 print:hidden transition-all">
-          <div className="bg-white shadow-xl w-full max-w-md h-screen flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-250">
+          <div className="bg-white shadow-xl w-full max-w-lg h-screen flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-250">
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">
-                  {lang === 'nl' ? 'Feestdagen beheren' : 'Manage Holidays'}
+                <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                  <span>{holidayDrawerTab === 'holidays' ? '🎉' : '🎒'}</span>
+                  <span>{lang === 'nl' ? 'Feestdagen & Schoolvakanties' : 'Holidays & School Vacations'}</span>
                 </h3>
                 <p className="text-[10px] text-slate-500">
-                  {lang === 'nl' ? `Beheer de feestdagen voor kalenderjaar ${selectedYear}` : `Manage public holidays for calendar year ${selectedYear}`}
+                  {lang === 'nl' ? `Beheer de officiële feestdagen en schoolvakanties voor ${selectedYear}` : `Manage holidays and vacations for ${selectedYear}`}
                 </p>
               </div>
               <button 
@@ -1982,6 +2153,10 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
                   setEditingHolidayId(null);
                   setHolidayTitle('');
                   setHolidayDate('');
+                  setEditingVacationId(null);
+                  setVacationTitle('');
+                  setVacationStartDate('');
+                  setVacationEndDate('');
                 }}
                 className="text-slate-400 hover:text-slate-600 font-bold"
               >
@@ -1989,209 +2164,466 @@ export const YearCalendar: React.FC<YearCalendarProps> = ({
               </button>
             </div>
 
+            {/* Tab selector */}
+            <div className="flex border-b border-slate-200 bg-slate-100/70 p-1.5 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setHolidayDrawerTab('holidays')}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  holidayDrawerTab === 'holidays'
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🎉 {lang === 'nl' ? 'Officiële Feestdagen' : 'Public Holidays'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHolidayDrawerTab('vacations')}
+                className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                  holidayDrawerTab === 'vacations'
+                    ? 'bg-white text-amber-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span>🎒 {lang === 'nl' ? 'Schoolvakanties' : 'School Vacations'}</span>
+              </button>
+            </div>
+
             <div className="p-6 flex flex-col gap-6 overflow-y-auto flex-1">
-              {/* Quick load automatic holidays button */}
-              <div className="bg-gradient-to-br from-indigo-50 to-sky-50 p-4 rounded-2xl border border-indigo-100/50 flex flex-col gap-2.5">
-                <div className="flex items-start gap-2.5">
-                  <span className="p-1.5 bg-indigo-500 text-white rounded-lg mt-0.5 shrink-0">
-                    <RefreshCw className="w-4 h-4" />
-                  </span>
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                      {lang === 'nl' ? 'Officiële NL Feestdagen' : 'Official NL Holidays'}
-                    </h4>
-                    <p className="text-[10px] text-slate-500 leading-relaxed mt-0.5">
-                      {lang === 'nl' 
-                        ? `Laad automatisch alle bekende officiële Nederlandse feestdagen (zoals Goede Vrijdag, Koningsdag, Hemelvaartsdag, en Kerst) voor het jaar ${selectedYear} met de juiste data.` 
-                        : `Automatically populate all standard Dutch holidays for ${selectedYear} on their mathematically correct solar/lunar dates.`}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={async () => {
-                    const count = await generateDutchHolidays();
-                    alert(lang === 'nl' 
-                      ? `${count} feestdagen succesvol toegevoegd/bijgewerkt voor ${selectedYear}!` 
-                      : `${count} public holidays loaded / updated successfully for ${selectedYear}!`
-                    );
-                  }}
-                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 transition"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  {lang === 'nl' ? 'Laad officiële feestdagen' : 'Load Official Holidays'}
-                </button>
-              </div>
-
-              {/* Form to Add / Edit holiday */}
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                if (!holidayTitle.trim() || !holidayDate) return;
-
-                // Feestdag category lookup or auto-creation
-                let feestdagCat = categories.find(c => c.name.toLowerCase() === 'feestdag' || c.id === 'cc-feestdag');
-                if (!feestdagCat) {
-                  feestdagCat = {
-                    id: 'cc-feestdag',
-                    name: 'Feestdag',
-                    color: 'sky'
-                  };
-                  await dbService.saveCalendarCategory(feestdagCat);
-                }
-
-                if (editingHolidayId) {
-                  const existing = events.find(ev => ev.id === editingHolidayId);
-                  if (existing) {
-                    const updated: YearEvent = {
-                      ...existing,
-                      title: holidayTitle,
-                      date: holidayDate,
-                      year: new Date(holidayDate).getFullYear()
-                    };
-                    await dbService.saveYearEvent(updated);
-                  }
-                  setEditingHolidayId(null);
-                } else {
-                  const newId = 'holiday-' + Math.random().toString(36).substr(2, 9);
-                  const newEv: YearEvent = {
-                    id: newId,
-                    year: new Date(holidayDate).getFullYear(),
-                    title: holidayTitle,
-                    description: lang === 'nl' ? 'Feestdag' : 'Holiday',
-                    categoryId: feestdagCat.id,
-                    date: holidayDate,
-                    type: 'one_time',
-                    isFeestdag: true
-                  };
-                  await dbService.saveYearEvent(newEv);
-                }
-
-                setHolidayTitle('');
-                setHolidayDate('');
-                loadData();
-              }} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col gap-3">
-                <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                  {editingHolidayId 
-                    ? (lang === 'nl' ? 'Feestdag bewerken' : 'Edit Holiday') 
-                    : (lang === 'nl' ? 'Handmatig feestdag toevoegen' : 'Add Custom Holiday')}
-                </h4>
-                
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">{lang === 'nl' ? 'Naam' : 'Title'}</label>
-                  <input 
-                    type="text"
-                    value={holidayTitle}
-                    required
-                    onChange={e => setHolidayTitle(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white"
-                    placeholder={lang === 'nl' ? 'Bijv: Carnaval of Extra Vrije Dag' : 'e.g. Easter Friday'}
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">{lang === 'nl' ? 'Datum' : 'Date'}</label>
-                  <input 
-                    type="date"
-                    value={holidayDate}
-                    required
-                    onChange={e => setHolidayDate(e.target.value)}
-                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-700"
-                  />
-                </div>
-
-                <div className="flex gap-2 justify-end mt-1">
-                  {editingHolidayId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingHolidayId(null);
-                        setHolidayTitle('');
-                        setHolidayDate('');
-                      }}
-                      className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold"
-                    >
-                      {lang === 'nl' ? 'Annuleren' : 'Cancel'}
-                    </button>
-                  )}
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 bg-indigo-650 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
-                  >
-                    {editingHolidayId ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                    {editingHolidayId 
-                      ? (lang === 'nl' ? 'Opslaan' : 'Save Changes') 
-                      : (lang === 'nl' ? 'Opslaan' : 'Save Holiday')}
-                  </button>
-                </div>
-              </form>
-
-              {/* Holidays list */}
-              <div className="flex flex-col gap-2.5">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                    {lang === 'nl' ? `Geregistreerde feestdagen (${selectedYear})` : `Registered Holidays (${selectedYear})`}
-                  </h4>
-                  <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">
-                    {events.filter(e => e.year === selectedYear && e.isFeestdag).length}
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-2 max-h-[350px] overflow-y-auto">
-                  {events
-                    .filter(e => e.year === selectedYear && e.isFeestdag)
-                    .sort((a, b) => a.date.localeCompare(b.date))
-                    .map(ev => (
-                      <div key={ev.id} className="flex items-center justify-between p-2.5 border border-slate-100 bg-white rounded-xl hover:border-slate-200 transition">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-slate-800">{ev.title}</span>
-                          <span className="text-[10px] font-mono text-slate-500">
-                            {new Date(ev.date).toLocaleDateString(lang === 'nl' ? 'nl-NL' : 'en-US', {
-                              weekday: 'short',
-                              day: 'numeric',
-                              month: 'short'
-                            })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingHolidayId(ev.id);
-                              setHolidayTitle(ev.title);
-                              setHolidayDate(ev.date);
-                            }}
-                            className="text-slate-400 hover:text-indigo-600 transition p-1.5"
-                            title={lang === 'nl' ? 'Bewerken' : 'Edit'}
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={async () => {
-                              if (confirm(lang === 'nl' ? `Weet u zeker dat u "${ev.title}" wilt verwijderen?` : `Are you sure you want to delete "${ev.title}"?`)) {
-                                await dbService.deleteYearEvent(ev.id);
-                                if (editingHolidayId === ev.id) {
-                                  setEditingHolidayId(null);
-                                  setHolidayTitle('');
-                                  setHolidayDate('');
-                                }
-                                loadData();
-                              }
-                            }}
-                            className="text-slate-400 hover:text-rose-600 transition p-1.5"
-                            title={lang === 'nl' ? 'Verwijderen' : 'Delete'}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+              {holidayDrawerTab === 'holidays' ? (
+                <>
+                  {/* Quick load automatic holidays button */}
+                  <div className="bg-gradient-to-br from-indigo-50 to-sky-50 p-4 rounded-2xl border border-indigo-100/50 flex flex-col gap-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <span className="p-1.5 bg-indigo-500 text-white rounded-lg mt-0.5 shrink-0">
+                        <RefreshCw className="w-4 h-4" />
+                      </span>
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                          {lang === 'nl' ? 'Officiële NL Feestdagen' : 'Official NL Holidays'}
+                        </h4>
+                        <p className="text-[10px] text-slate-500 leading-relaxed mt-0.5">
+                          {lang === 'nl' 
+                            ? `Laad automatisch alle bekende officiële Nederlandse feestdagen voor het jaar ${selectedYear} met de juiste data.` 
+                            : `Automatically populate standard Dutch holidays for ${selectedYear}.`}
+                        </p>
                       </div>
-                    ))}
-
-                  {events.filter(e => e.year === selectedYear && e.isFeestdag).length === 0 && (
-                    <div className="text-center py-8 text-slate-400 text-xs italic border border-dashed border-slate-250 rounded-xl">
-                      {lang === 'nl' ? 'Nog geen feestdagen geladen voor dit jaar.' : 'No public holidays loaded for this year.'}
                     </div>
-                  )}
-                </div>
-              </div>
+                    <button
+                      onClick={async () => {
+                        const count = await generateDutchHolidays();
+                        alert(lang === 'nl' 
+                          ? `${count} feestdagen succesvol toegevoegd/bijgewerkt voor ${selectedYear}!` 
+                          : `${count} public holidays loaded / updated successfully for ${selectedYear}!`
+                        );
+                      }}
+                      className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      {lang === 'nl' ? 'Laad officiële feestdagen' : 'Load Official Holidays'}
+                    </button>
+                  </div>
 
+                  {/* Form to Add / Edit holiday */}
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!holidayTitle.trim() || !holidayDate) return;
+
+                    let feestdagCat = categories.find(c => c.name.toLowerCase() === 'feestdag' || c.id === 'cc-feestdag');
+                    if (!feestdagCat) {
+                      feestdagCat = {
+                        id: 'cc-feestdag',
+                        name: 'Feestdag',
+                        color: 'sky'
+                      };
+                      await dbService.saveCalendarCategory(feestdagCat);
+                    }
+
+                    if (editingHolidayId) {
+                      const existing = events.find(ev => ev.id === editingHolidayId);
+                      if (existing) {
+                        const updated: YearEvent = {
+                          ...existing,
+                          title: holidayTitle,
+                          date: holidayDate,
+                          year: new Date(holidayDate).getFullYear()
+                        };
+                        await dbService.saveYearEvent(updated);
+                      }
+                      setEditingHolidayId(null);
+                    } else {
+                      const newId = 'holiday-' + Math.random().toString(36).substr(2, 9);
+                      const newEv: YearEvent = {
+                        id: newId,
+                        year: new Date(holidayDate).getFullYear(),
+                        title: holidayTitle,
+                        description: lang === 'nl' ? 'Feestdag' : 'Holiday',
+                        categoryId: feestdagCat.id,
+                        date: holidayDate,
+                        type: 'one_time',
+                        isFeestdag: true
+                      };
+                      await dbService.saveYearEvent(newEv);
+                    }
+
+                    setHolidayTitle('');
+                    setHolidayDate('');
+                    loadData();
+                  }} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col gap-3">
+                    <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                      {editingHolidayId 
+                        ? (lang === 'nl' ? 'Feestdag bewerken' : 'Edit Holiday') 
+                        : (lang === 'nl' ? 'Handmatig feestdag toevoegen' : 'Add Custom Holiday')}
+                    </h4>
+                    
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">{lang === 'nl' ? 'Naam' : 'Title'}</label>
+                      <input 
+                        type="text" 
+                        value={holidayTitle}
+                        required
+                        onChange={e => setHolidayTitle(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white"
+                        placeholder={lang === 'nl' ? 'Bijv: Carnaval of Extra Vrije Dag' : 'e.g. Easter Friday'}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">{lang === 'nl' ? 'Datum' : 'Date'}</label>
+                      <input 
+                        type="date" 
+                        value={holidayDate}
+                        required
+                        onChange={e => setHolidayDate(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-700"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 justify-end mt-1">
+                      {editingHolidayId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingHolidayId(null);
+                            setHolidayTitle('');
+                            setHolidayDate('');
+                          }}
+                          className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
+                        >
+                          {lang === 'nl' ? 'Annuleren' : 'Cancel'}
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        {editingHolidayId ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                        {editingHolidayId 
+                          ? (lang === 'nl' ? 'Opslaan' : 'Save Changes') 
+                          : (lang === 'nl' ? 'Opslaan' : 'Save Holiday')}
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Holidays list */}
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                        {lang === 'nl' ? `Geregistreerde feestdagen (${selectedYear})` : `Registered Holidays (${selectedYear})`}
+                      </h4>
+                      <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold">
+                        {events.filter(e => e.year === selectedYear && e.isFeestdag).length}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-2 max-h-[350px] overflow-y-auto">
+                      {events
+                        .filter(e => e.year === selectedYear && e.isFeestdag)
+                        .sort((a, b) => a.date.localeCompare(b.date))
+                        .map(ev => (
+                          <div key={ev.id} className="flex items-center justify-between p-2.5 border border-slate-100 bg-white rounded-xl hover:border-slate-200 transition">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-800">{ev.title}</span>
+                              <span className="text-[10px] font-mono text-slate-500">
+                                {new Date(ev.date).toLocaleDateString(lang === 'nl' ? 'nl-NL' : 'en-US', {
+                                  weekday: 'short',
+                                  day: 'numeric',
+                                  month: 'short'
+                                })}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  setEditingHolidayId(ev.id);
+                                  setHolidayTitle(ev.title);
+                                  setHolidayDate(ev.date);
+                                }}
+                                className="text-slate-400 hover:text-indigo-600 transition p-1.5 cursor-pointer"
+                                title={lang === 'nl' ? 'Bewerken' : 'Edit'}
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (confirm(lang === 'nl' ? `Weet u zeker dat u "${ev.title}" wilt verwijderen?` : `Are you sure you want to delete "${ev.title}"?`)) {
+                                    await dbService.deleteYearEvent(ev.id);
+                                    if (editingHolidayId === ev.id) {
+                                      setEditingHolidayId(null);
+                                      setHolidayTitle('');
+                                      setHolidayDate('');
+                                    }
+                                    loadData();
+                                  }
+                                }}
+                                className="text-slate-400 hover:text-rose-600 transition p-1.5 cursor-pointer"
+                                title={lang === 'nl' ? 'Verwijderen' : 'Delete'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                      {events.filter(e => e.year === selectedYear && e.isFeestdag).length === 0 && (
+                        <div className="text-center py-8 text-slate-400 text-xs italic border border-dashed border-slate-200 rounded-xl">
+                          {lang === 'nl' ? 'Nog geen feestdagen geladen voor dit jaar.' : 'No public holidays loaded for this year.'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* TAB 2: SCHOOLVAKANTIES */
+                <>
+                  {/* Pre-fill advice dates banner */}
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-2xl border border-amber-200/60 flex flex-col gap-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <span className="p-1.5 bg-amber-500 text-white rounded-lg mt-0.5 shrink-0">
+                        🎒
+                      </span>
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                          {lang === 'nl' ? 'Adviesdata Schoolvakanties Laden' : 'Load School Vacation Dates'}
+                        </h4>
+                        <p className="text-[10px] text-slate-500 leading-relaxed mt-0.5">
+                          {lang === 'nl' 
+                            ? `Laad in 1 klik de officiële adviesdata voor de schoolvakanties (Voorjaars-, Mei-, Zomer-, Herfst- en Kerstvakantie) voor ${selectedYear}. Deze perioden worden direct gearceerd op de kalender.` 
+                            : `Load the 5 standard Dutch school holidays for ${selectedYear} with start and end dates.`}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const count = await generateDutchSchoolHolidays();
+                        alert(lang === 'nl' 
+                          ? `${count} schoolvakanties succesvol toegevoegd/bijgewerkt voor ${selectedYear}!` 
+                          : `${count} school vacation periods added / updated!`
+                        );
+                      }}
+                      className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      {lang === 'nl' ? 'Laad adviesdata schoolvakanties' : 'Load School Vacations'}
+                    </button>
+                  </div>
+
+                  {/* Form to Add / Edit School Vacation Period */}
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!vacationTitle.trim() || !vacationStartDate) return;
+
+                    let vacCat = categories.find(c => c.name.toLowerCase() === 'schoolvakantie' || c.id === 'cc-schoolvakantie');
+                    if (!vacCat) {
+                      vacCat = {
+                        id: 'cc-schoolvakantie',
+                        name: 'Schoolvakantie',
+                        color: 'slate'
+                      };
+                      await dbService.saveCalendarCategory(vacCat);
+                    }
+
+                    if (editingVacationId) {
+                      const existing = events.find(ev => ev.id === editingVacationId);
+                      if (existing) {
+                        const updated: YearEvent = {
+                          ...existing,
+                          title: vacationTitle.trim(),
+                          date: vacationStartDate,
+                          endDate: vacationEndDate || vacationStartDate,
+                          year: new Date(vacationStartDate).getFullYear(),
+                          isSchoolVacation: true
+                        };
+                        await dbService.saveYearEvent(updated);
+                      }
+                      setEditingVacationId(null);
+                    } else {
+                      const newId = 'vac-' + Math.random().toString(36).substr(2, 9);
+                      const newEv: YearEvent = {
+                        id: newId,
+                        year: new Date(vacationStartDate).getFullYear(),
+                        title: vacationTitle.trim(),
+                        description: lang === 'nl' ? 'Schoolvakantie periode' : 'School vacation period',
+                        categoryId: vacCat.id,
+                        date: vacationStartDate,
+                        endDate: vacationEndDate || vacationStartDate,
+                        type: 'one_time',
+                        isSchoolVacation: true
+                      };
+                      await dbService.saveYearEvent(newEv);
+                    }
+
+                    setVacationTitle('');
+                    setVacationStartDate('');
+                    setVacationEndDate('');
+                    loadData();
+                  }} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 flex flex-col gap-3">
+                    <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                      {editingVacationId 
+                        ? (lang === 'nl' ? 'Schoolvakantie bewerken' : 'Edit School Vacation') 
+                        : (lang === 'nl' ? 'Schoolvakantie / Periode toevoegen' : 'Add School Vacation Period')}
+                    </h4>
+                    
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">{lang === 'nl' ? 'Naam van de vakantie *' : 'Vacation Title *'}</label>
+                      <input 
+                        type="text" 
+                        value={vacationTitle}
+                        required
+                        onChange={e => setVacationTitle(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white font-medium"
+                        placeholder={lang === 'nl' ? 'Bijv: Zomervakantie 2026 of Bouwvak' : 'e.g. Summer Vacation'}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">{lang === 'nl' ? 'Begindatum *' : 'Start Date *'}</label>
+                        <input 
+                          type="date"
+                          value={vacationStartDate}
+                          required
+                          onChange={e => setVacationStartDate(e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-700"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">{lang === 'nl' ? 'Einddatum *' : 'End Date *'}</label>
+                        <input 
+                          type="date"
+                          value={vacationEndDate}
+                          min={vacationStartDate}
+                          required
+                          onChange={e => setVacationEndDate(e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-700"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 italic">
+                      {lang === 'nl' 
+                        ? 'Alle dagen tussen de begin- en einddatum worden gemarkeerd met de herkenbare grijze arcering.'
+                        : 'All days within this date range will be highlighted on the year calendar.'}
+                    </p>
+
+                    <div className="flex gap-2 justify-end mt-1">
+                      {editingVacationId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingVacationId(null);
+                            setVacationTitle('');
+                            setVacationStartDate('');
+                            setVacationEndDate('');
+                          }}
+                          className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer"
+                        >
+                          {lang === 'nl' ? 'Annuleren' : 'Cancel'}
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        {editingVacationId ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                        {editingVacationId 
+                          ? (lang === 'nl' ? 'Wijziging Opslaan' : 'Save Changes') 
+                          : (lang === 'nl' ? 'Vakantie Toevoegen' : 'Add Vacation')}
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Registered School Vacations list */}
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                        {lang === 'nl' ? `Geregistreerde Schoolvakanties (${selectedYear})` : `Registered Vacations (${selectedYear})`}
+                      </h4>
+                      <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                        {events.filter(e => e.year === selectedYear && e.isSchoolVacation).length}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-2 max-h-[350px] overflow-y-auto">
+                      {events
+                        .filter(e => e.year === selectedYear && e.isSchoolVacation)
+                        .sort((a, b) => a.date.localeCompare(b.date))
+                        .map(ev => (
+                          <div key={ev.id} className="flex items-center justify-between p-3 border border-slate-200/80 bg-white rounded-xl hover:border-slate-300 transition shadow-2xs">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                <span>🎒</span>
+                                <span>{ev.title}</span>
+                              </span>
+                              <span className="text-[11px] font-mono text-slate-500 mt-0.5">
+                                {ev.date} {ev.endDate && ev.endDate !== ev.date ? `t/m ${ev.endDate}` : ''}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  setEditingVacationId(ev.id);
+                                  setVacationTitle(ev.title);
+                                  setVacationStartDate(ev.date);
+                                  setVacationEndDate(ev.endDate || ev.date);
+                                }}
+                                className="text-slate-400 hover:text-indigo-600 transition p-1.5 cursor-pointer"
+                                title={lang === 'nl' ? 'Bewerken' : 'Edit'}
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (confirm(lang === 'nl' ? `Weet u zeker dat u "${ev.title}" wilt verwijderen?` : `Are you sure you want to delete "${ev.title}"?`)) {
+                                    await dbService.deleteYearEvent(ev.id);
+                                    if (editingVacationId === ev.id) {
+                                      setEditingVacationId(null);
+                                      setVacationTitle('');
+                                      setVacationStartDate('');
+                                      setVacationEndDate('');
+                                    }
+                                    loadData();
+                                  }
+                                }}
+                                className="text-slate-400 hover:text-rose-600 transition p-1.5 cursor-pointer"
+                                title={lang === 'nl' ? 'Verwijderen' : 'Delete'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                      {events.filter(e => e.year === selectedYear && e.isSchoolVacation).length === 0 && (
+                        <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
+                          {lang === 'nl' ? 'Nog geen schoolvakanties ingesteld voor dit jaar. Klik hierboven op "Laad adviesdata" of voer handmatig een periode in.' : 'No school vacations registered yet.'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

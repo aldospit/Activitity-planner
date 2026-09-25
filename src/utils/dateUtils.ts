@@ -53,3 +53,7 @@ export function isDateInRange(targetStr: string, startStr: string, endStr: strin
   const end = endStr ? new Date(endStr).getTime() : start;
   return target >= start && target <= end;
 }
+
+export function getDaysInMonth(year: number, monthIndex: number): number {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}

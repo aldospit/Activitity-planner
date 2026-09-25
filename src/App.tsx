@@ -15,6 +15,11 @@ import { SharedCalendarView } from './components/SharedCalendarView';
 import MeetingManager from './components/MeetingManager';
 import MeetingAgendaPage from './components/MeetingAgendaPage';
 import FindTimeSelector from './components/FindTimeSelector';
+import TaskManagerBoard from './components/TaskManagerBoard';
+import VacationPlanner from './components/VacationPlanner';
+import VacationCalendarSharePage from './components/VacationCalendarSharePage';
+import { NotificationCenter } from './components/NotificationCenter';
+import { TaskParticipantPage } from './components/TaskParticipantPage';
 import { exportInviteesToCsv } from './utils/csv';
 import { generateGoogleCalendarLink, generateOutlookLink, downloadIcsFile } from './utils/calendar';
 import { getPublicOrigin } from './utils/url';
@@ -23,7 +28,7 @@ import {
   Clock, Share2, Clipboard, ArrowRight, Trash2, 
   BarChart3, RefreshCw, Send, Check, AlertCircle, Sparkles, Languages,
   BookOpen, ExternalLink, Download, FileSpreadsheet, Inbox, Link, Globe, Database,
-  UserPlus, Copy, FolderKanban, ListTodo
+  UserPlus, Copy, FolderKanban, ListTodo, Archive, ArchiveRestore, CheckSquare, Palmtree
 } from 'lucide-react';
 import { DataImportExportModal } from './components/DataImportExportModal';
 import SmtpConfigModal from './components/SmtpConfigModal';
@@ -71,12 +76,24 @@ export default function App() {
   const [sharedCalendarSlugOrId, setSharedCalendarSlugOrId] = useState<string | null>(null);
   const [sharedCalendarYear, setSharedCalendarYear] = useState<number | null>(null);
   const [sharedCalendarOwner, setSharedCalendarOwner] = useState<string | null>(null);
+  const [vacationCalSlug, setVacationCalSlug] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('vacation_cal') || params.get('vacation') || null;
+  });
   const [meetingAgendaId, setMeetingAgendaId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('meeting_agenda') || params.get('agenda_id') || null;
   });
+  const [assigneeTasksContactId, setAssigneeTasksContactId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('assignee_tasks') || null;
+  });
+  const [singleTaskId, setSingleTaskId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('task_id') || null;
+  });
 
-  // Parse URL query parameter: ?poll=pollId, ?sharedCalendar=slug, ?agenda=slug, ?calendar=year&owner=userId, ?tool=datumprikker, ?meeting_agenda=meetingId
+  // Parse URL query parameter: ?poll=pollId, ?sharedCalendar=slug, ?agenda=slug, ?calendar=year&owner=userId, ?tool=datumprikker, ?meeting_agenda=meetingId, ?vacation_cal=slug, ?assignee_tasks=contactId, ?task_id=taskId
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pollParam = params.get('poll');
@@ -84,7 +101,20 @@ export default function App() {
     const calendarParam = params.get('calendar');
     const ownerParam = params.get('owner');
     const toolParam = params.get('tool');
+    const tabParam = params.get('tab');
     const meetingAgendaParam = params.get('meeting_agenda') || params.get('agenda_id');
+    const vacationParam = params.get('vacation_cal') || params.get('vacation');
+    const assigneeTasksParam = params.get('assignee_tasks');
+    const singleTaskParam = params.get('task_id');
+
+    setAssigneeTasksContactId(assigneeTasksParam || null);
+    setSingleTaskId(singleTaskParam || null);
+
+    if (vacationParam) {
+      setVacationCalSlug(vacationParam);
+    } else {
+      setVacationCalSlug(null);
+    }
 
     if (meetingAgendaParam) {
       setMeetingAgendaId(meetingAgendaParam);
@@ -118,15 +148,25 @@ export default function App() {
     } else if (toolParam === 'agenda' || toolParam === 'sharedcalendar') {
       setActiveTabState('sharedcalendar');
       setIsStandaloneDatumprikker(false);
+    } else if (toolParam === 'tasks' || toolParam === 'taken' || toolParam === 'takenoverzicht') {
+      setActiveTabState('tasks');
+      setIsStandaloneDatumprikker(false);
+    } else if (toolParam === 'vacation' || toolParam === 'vakantie' || toolParam === 'verlof') {
+      setActiveTabState('vacation');
+      setIsStandaloneDatumprikker(false);
+    } else if (toolParam === 'notifications' || toolParam === 'notificaties' || tabParam === 'notifications' || tabParam === 'notificaties') {
+      setActiveTabState('notifications');
+      setIsStandaloneDatumprikker(false);
     } else {
       setIsStandaloneDatumprikker(false);
     }
   }, []);
 
   // UI Active Section
-  const [activeTab, setActiveTabState] = useState<'polls' | 'contacts' | 'weekplanner' | 'sharedcalendar' | 'projectplanner' | 'yearcalendar' | 'meetings'>(() => {
+  const [activeTab, setActiveTabState] = useState<'polls' | 'contacts' | 'weekplanner' | 'sharedcalendar' | 'projectplanner' | 'yearcalendar' | 'meetings' | 'tasks' | 'vacation' | 'notifications'>(() => {
     const params = new URLSearchParams(window.location.search);
     const toolParam = params.get('tool');
+    const tabParam = params.get('tab');
     if (toolParam === 'datumprikker' || toolParam === 'polls') {
       return 'polls';
     }
@@ -136,14 +176,23 @@ export default function App() {
     if (toolParam === 'meetings' || toolParam === 'notities' || params.get('meeting_id') || params.get('action_id')) {
       return 'meetings';
     }
+    if (toolParam === 'tasks' || toolParam === 'taken' || toolParam === 'takenoverzicht') {
+      return 'tasks';
+    }
+    if (toolParam === 'vacation' || toolParam === 'vakantie' || toolParam === 'verlof') {
+      return 'vacation';
+    }
+    if (toolParam === 'notifications' || toolParam === 'notificaties' || tabParam === 'notifications' || tabParam === 'notificaties') {
+      return 'notifications';
+    }
     const saved = localStorage.getItem('itpt_active_tab');
-    if (saved === 'polls' || saved === 'contacts' || saved === 'weekplanner' || saved === 'sharedcalendar' || saved === 'projectplanner' || saved === 'yearcalendar' || saved === 'meetings') {
+    if (saved === 'polls' || saved === 'contacts' || saved === 'weekplanner' || saved === 'sharedcalendar' || saved === 'projectplanner' || saved === 'yearcalendar' || saved === 'meetings' || saved === 'tasks' || saved === 'vacation' || saved === 'notifications') {
       return saved as any;
     }
     return 'polls';
   });
 
-  const setActiveTab = (tab: 'polls' | 'contacts' | 'weekplanner' | 'sharedcalendar' | 'projectplanner' | 'yearcalendar' | 'meetings') => {
+  const setActiveTab = (tab: 'polls' | 'contacts' | 'weekplanner' | 'sharedcalendar' | 'projectplanner' | 'yearcalendar' | 'meetings' | 'tasks' | 'vacation' | 'notifications') => {
     if (isStandaloneDatumprikker) {
       setActiveTabState('polls');
       return;
@@ -157,6 +206,8 @@ export default function App() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [selectedMeetingIdForTab, setSelectedMeetingIdForTab] = useState<string | null>(null);
+  const [pollsFilter, setPollsFilter] = useState<'active' | 'archived' | 'all'>('active');
 
   // Poll Creator States
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -1624,6 +1675,132 @@ export default function App() {
     }
   };
 
+  const handleToggleArchivePoll = async (poll: Poll, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const updatedPoll: Poll = {
+        ...poll,
+        archived: !poll.archived
+      };
+      await dbService.savePoll(updatedPoll);
+      refreshCoreData();
+      setReminderSentAlert(
+        lang === 'nl'
+          ? (updatedPoll.archived ? `Datumprikker "${poll.title}" gearchiveerd.` : `Datumprikker "${poll.title}" teruggezet naar actief.`)
+          : (updatedPoll.archived ? `Poll "${poll.title}" archived.` : `Poll "${poll.title}" restored.`)
+      );
+      setTimeout(() => setReminderSentAlert(null), 3000);
+    } catch (err: any) {
+      console.error('Error toggling archive:', err);
+    }
+  };
+
+  const handlePromotePollToMeeting = async (poll: Poll, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      // 1. Determine suitable date/time: finalized option if exists, otherwise recommended option
+      let chosenOption = poll.options.find(o => o.id === poll.finalizedOptionId);
+      if (!chosenOption) {
+        const recId = getRecommendedOptionId(poll);
+        chosenOption = poll.options.find(o => o.id === recId) || poll.options[0];
+      }
+
+      const startDateTime = chosenOption?.dateTime || new Date().toISOString();
+      const duration = chosenOption?.durationMin || 60;
+      
+      const startDate = new Date(startDateTime);
+      const endDate = new Date(startDate.getTime() + duration * 60000);
+      const dateStr = startDateTime.slice(0, 10);
+      const startTimeStr = startDateTime.slice(11, 16);
+      const endTimeStr = getLocalISOString(endDate).slice(11, 16);
+
+      const pollInvitees = dbService.getInviteesForPoll(poll.id);
+      const participants = pollInvitees.map(inv => ({
+        name: `${inv.firstName} ${inv.lastName}`.trim() || inv.email,
+        email: inv.email,
+        role: 'participant' as const,
+        attendance: 'present' as const
+      }));
+
+      const newMeetingId = 'meet-' + Math.random().toString(36).substring(2, 9);
+      const newMeeting = {
+        id: newMeetingId,
+        title: poll.title,
+        date: dateStr,
+        startTime: startTimeStr,
+        endTime: endTimeStr,
+        location: poll.locationAddress || (poll.locationType === 'digital' ? 'Online meeting' : ''),
+        locationType: (poll.locationType as any) || 'physical',
+        type: 'project' as const,
+        status: 'scheduled' as const,
+        chair: auth.currentUser?.displayName || auth.currentUser?.email || '',
+        minuteTaker: '',
+        participants,
+        agenda: [
+          {
+            id: 'item-1',
+            order: 1,
+            time: startTimeStr,
+            duration: 10,
+            title: 'Opening & Welkom',
+            description: 'Vaststellen agenda en inventarisatie aanwezigen',
+            presenter: auth.currentUser?.displayName || 'Voorzitter',
+            status: 'planned' as const
+          },
+          {
+            id: 'item-2',
+            order: 2,
+            time: '',
+            duration: Math.max(15, duration - 25),
+            title: poll.title,
+            description: poll.description || 'Bespreking van het onderwerp',
+            presenter: '',
+            status: 'planned' as const
+          },
+          {
+            id: 'item-3',
+            order: 3,
+            time: '',
+            duration: 15,
+            title: 'Acties, afspraken & Rondvraag',
+            description: 'Vastleggen actiepunten en vervolgafspraken',
+            presenter: '',
+            status: 'planned' as const
+          }
+        ],
+        notes: poll.description ? `Gepromoveerd vanuit Datumprikker: "${poll.title}".\n\n${poll.description}` : `Gepromoveerd vanuit Datumprikker: "${poll.title}".`,
+        decisions: [],
+        actionItems: [],
+        pollId: poll.id,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        ownerId: auth.currentUser?.uid || undefined
+      };
+
+      await dbService.saveMeeting(newMeeting as any);
+
+      // Link meeting to poll and keep poll preserved in archive
+      const updatedPoll: Poll = {
+        ...poll,
+        promotedMeetingId: newMeetingId,
+        archived: true
+      };
+      await dbService.savePoll(updatedPoll);
+      refreshCoreData();
+
+      // Navigate to meetings tab and select the created meeting
+      setSelectedMeetingIdForTab(newMeetingId);
+      setActiveTab('meetings');
+
+      alert(lang === 'nl' 
+        ? `Succes! De datumprikker is gepromoveerd naar een meeting in "Notities, Afspraken & Acties". De datumprikker is bewaard in het Archief.` 
+        : `Success! The poll has been promoted to a meeting in "Notes, Agreements & Actions". The poll is preserved in the Archive.`);
+    } catch (err: any) {
+      console.error('Error promoting poll to meeting:', err);
+      alert(lang === 'nl' ? `Fout bij promoveren: ${err?.message || err}` : `Error promoting: ${err?.message || err}`);
+    }
+  };
+
   // Render Guest public shared agenda if requested in URL parameter (?sharedCalendar=slug or ?agenda=slug)
   if (sharedCalendarSlugOrId) {
     return (
@@ -1661,6 +1838,44 @@ export default function App() {
           url.searchParams.delete('meeting_agenda');
           url.searchParams.delete('agenda_id');
           window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+        }}
+      />
+    );
+  }
+
+  // Render Participant Vacation & Leave entry screen if requested in URL parameter (?vacation_cal=slug)
+  if (vacationCalSlug) {
+    return (
+      <VacationCalendarSharePage
+        calendarSlug={vacationCalSlug}
+        lang={lang}
+        onBackToAdmin={() => {
+          setVacationCalSlug(null);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('vacation_cal');
+          url.searchParams.delete('vacation');
+          window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+          setActiveTabState('vacation');
+        }}
+      />
+    );
+  }
+
+  // Render Participant Task Portal Page if requested in URL parameter (?assignee_tasks=contactId or ?task_id=taskId)
+  if (assigneeTasksContactId || singleTaskId) {
+    return (
+      <TaskParticipantPage
+        contactId={assigneeTasksContactId || undefined}
+        taskId={singleTaskId || undefined}
+        lang={lang}
+        onOpenMainApp={() => {
+          setAssigneeTasksContactId(null);
+          setSingleTaskId(null);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('assignee_tasks');
+          url.searchParams.delete('task_id');
+          window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+          setActiveTabState('tasks');
         }}
       />
     );
@@ -2061,6 +2276,38 @@ export default function App() {
                 <Calendar className="h-4.5 w-4.5" />
                 <span>{lang === 'nl' ? 'Jaarkalender' : 'Year Calendar'}</span>
               </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('tasks');
+                  setShowCreateForm(false);
+                }}
+                className={`px-5 py-3 rounded-xl text-sm font-black transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 flex-grow md:flex-grow-0 ${
+                  activeTab === 'tasks'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 ring-4 ring-indigo-100'
+                    : 'bg-indigo-50/40 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 border border-indigo-100'
+                }`}
+                id="tab-tasks"
+              >
+                <CheckSquare className="h-4.5 w-4.5" />
+                <span>{lang === 'nl' ? 'Takenoverzicht' : 'Task Board'}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('vacation');
+                  setShowCreateForm(false);
+                }}
+                className={`px-5 py-3 rounded-xl text-sm font-black transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 flex-grow md:flex-grow-0 ${
+                  activeTab === 'vacation'
+                    ? 'bg-teal-600 text-white shadow-md shadow-teal-200 ring-4 ring-teal-100'
+                    : 'bg-teal-50/40 text-teal-700 hover:bg-teal-50 hover:text-teal-800 border border-teal-100'
+                }`}
+                id="tab-vacation"
+              >
+                <Palmtree className="h-4.5 w-4.5" />
+                <span>{lang === 'nl' ? 'Vakantie & Verlof' : 'Vacation & Leave'}</span>
+              </button>
               
               <button
                 onClick={() => {
@@ -2081,6 +2328,22 @@ export default function App() {
                 }`}>
                   {contacts.length}
                 </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setActiveTab('notifications');
+                  setShowCreateForm(false);
+                }}
+                className={`px-5 py-3 rounded-xl text-sm font-black transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 flex-grow md:flex-grow-0 ${
+                  activeTab === 'notifications'
+                    ? 'bg-amber-600 text-white shadow-md shadow-amber-200 ring-4 ring-amber-100'
+                    : 'bg-amber-50/40 text-amber-700 hover:bg-amber-50 hover:text-amber-800 border border-amber-100'
+                }`}
+                id="tab-notifications"
+              >
+                <Bell className="h-4.5 w-4.5" />
+                <span>{lang === 'nl' ? 'Notificaties' : 'Notifications'}</span>
               </button>
             </div>
             
@@ -2112,6 +2375,45 @@ export default function App() {
           <Weekplanner lang={lang} />
         )}
 
+        {/* Option: Takenoverzicht / Trello Bord Tab */}
+        {activeTab === 'tasks' && (
+          <TaskManagerBoard
+            lang={lang}
+            onOpenWeekPlanner={() => setActiveTab('weekplanner')}
+            onOpenProjectPlanner={(projId) => {
+              setActiveTab('projectplanner');
+            }}
+            onOpenNotifications={() => setActiveTab('notifications')}
+            sendEmailUnified={sendEmailUnified}
+          />
+        )}
+
+        {/* Option: Notificaties & Reminders Hub Tab */}
+        {activeTab === 'notifications' && (
+          <NotificationCenter
+            lang={lang}
+            onOpenPoll={(pollId) => {
+              setActiveTab('polls');
+              setExpandedPollId(pollId);
+            }}
+            onOpenTasks={() => {
+              setActiveTab('tasks');
+            }}
+            onOpenMeetings={(meetingId) => {
+              if (meetingId) {
+                setSelectedMeetingIdForTab(meetingId);
+              }
+              setActiveTab('meetings');
+            }}
+            sendEmailUnified={sendEmailUnified}
+          />
+        )}
+
+        {/* Option: Vakantie & Verlof Kalender Tab */}
+        {activeTab === 'vacation' && (
+          <VacationPlanner lang={lang} />
+        )}
+
         {/* Option 6: Shared Calendar Tab */}
         {activeTab === 'sharedcalendar' && (
           <SharedCalendarView lang={lang} isStandalonePublic={false} />
@@ -2124,7 +2426,14 @@ export default function App() {
 
         {/* Option 7: Meetings, Notes, Agreements & Actions Tab */}
         {activeTab === 'meetings' && (
-          <MeetingManager lang={lang} />
+          <MeetingManager
+            lang={lang}
+            initialSelectedMeetingId={selectedMeetingIdForTab || undefined}
+            onNavigateToPoll={(pollId) => {
+              setActiveTab('polls');
+              setExpandedPollId(pollId);
+            }}
+          />
         )}
 
         {/* Option 5: Year Calendar Tab */}
@@ -2713,131 +3022,262 @@ export default function App() {
               </div>
             )}
 
-            {/* List of active polls / agreements */}
-            {polls.length === 0 ? (
-              <div className="bg-white rounded-2xl p-12 text-center border border-slate-200/50" id="no-polls-placeholder">
-                <Calendar className="h-12 w-12 text-slate-300 mx-auto mb-4 animate-pulse" />
-                <h3 className="text-lg font-bold text-slate-700">{t.noPollsYet}</h3>
-                <p className="text-slate-500 text-sm mt-1">{lang === 'nl' ? 'Begin door je eerste datumprikker op te zetten!' : 'Start by building your very first poll!'}</p>
-                <button
-                  onClick={() => setShowCreateForm(true)}
-                  className="mt-6 py-2 px-4 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all cursor-pointer shadow-md shadow-indigo-100"
-                >
-                  {t.createNewPoll}
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-6" id="active-polls-list">
-                {polls.map((poll) => {
-                  const pollInvitees = dbService.getInviteesForPoll(poll.id);
-                  const votedCount = pollInvitees.filter(i => i.votedAt).length;
-                  const totalCount = pollInvitees.length;
-                  const percentVoted = totalCount > 0 ? Math.round((votedCount / totalCount) * 100) : 0;
-                  
-                  const isExpanded = expandedPollId === poll.id;
-                  const isFinalized = poll.finalizedOptionId !== null;
+            {/* Datumprikkers Filter / Tabs: Actief vs Archief */}
+            {(() => {
+              const activePolls = polls.filter(p => !p.archived);
+              const archivedPolls = polls.filter(p => !!p.archived);
+              const displayedPolls = polls.filter(p => {
+                if (pollsFilter === 'active') return !p.archived;
+                if (pollsFilter === 'archived') return !!p.archived;
+                return true;
+              });
 
-                  return (
-                    <div key={poll.id} className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm hover:shadow-md transition-all">
-                      
-                      {/* Accordion header brief info summary */}
-                      <div className="p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer" onClick={() => setExpandedPollId(isExpanded ? null : poll.id)}>
-                        <div className="flex items-start gap-4 flex-1">
-                          <div className={`h-11 w-11 rounded-2xl flex items-center justify-center text-lg font-bold ${
-                            isFinalized 
-                              ? 'bg-amber-100 text-amber-700 border border-amber-200' 
-                              : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                          }`}>
-                            {isFinalized ? '🏆' : '🗳️'}
-                          </div>
-                          
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-bold text-slate-800 text-base">{poll.title}</h3>
-                              {isFinalized && (
-                                <span className="bg-amber-100 text-amber-800 text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1">
-                                  <span>📅</span> {lang === 'nl' ? 'Vastgelegd' : 'Finalized'}
-                                </span>
-                              )}
-                            </div>
+              return (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-2xs">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => setPollsFilter('active')}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                          pollsFilter === 'active'
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
+                        }`}
+                      >
+                        <span>{lang === 'nl' ? 'Actieve Datumprikkers' : 'Active Polls'}</span>
+                        <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${
+                          pollsFilter === 'active' ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          {activePolls.length}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => setPollsFilter('archived')}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
+                          pollsFilter === 'archived'
+                            ? 'bg-amber-600 text-white shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
+                        }`}
+                      >
+                        <Archive className="w-3.5 h-3.5" />
+                        <span>{lang === 'nl' ? 'Archief Datumprikkers' : 'Archived Polls'}</span>
+                        <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${
+                          pollsFilter === 'archived' ? 'bg-amber-800 text-amber-100' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          {archivedPolls.length}
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => setPollsFilter('all')}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          pollsFilter === 'all'
+                            ? 'bg-slate-800 text-white shadow-xs'
+                            : 'bg-slate-100 hover:bg-slate-200/80 text-slate-600'
+                        }`}
+                      >
+                        <span>{lang === 'nl' ? 'Alle' : 'All'}</span>
+                        <span className="text-[10px] opacity-75">({polls.length})</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setShowCreateForm(!showCreateForm)}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer ml-auto sm:ml-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>{t.createNewPoll}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* List of active/archived polls */}
+                  {displayedPolls.length === 0 ? (
+                    <div className="bg-white rounded-2xl p-12 text-center border border-slate-200/50" id="no-polls-placeholder">
+                      {pollsFilter === 'archived' ? (
+                        <>
+                          <Archive className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                          <h3 className="text-lg font-bold text-slate-700">{lang === 'nl' ? 'Geen gearchiveerde datumprikkers' : 'No archived polls'}</h3>
+                          <p className="text-slate-500 text-sm mt-1 max-w-md mx-auto">
+                            {lang === 'nl' 
+                              ? 'Afgeronde of gepromoveerde datumprikkers worden hier bewaard. Gebruik de archiveer-knop op een datumprikker om deze naar het archief te verplaatsen.' 
+                              : 'Finalized or promoted polls are stored here. Use the archive button on any poll to move it to the archive.'}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <Calendar className="h-12 w-12 text-slate-300 mx-auto mb-4 animate-pulse" />
+                          <h3 className="text-lg font-bold text-slate-700">{t.noPollsYet}</h3>
+                          <p className="text-slate-500 text-sm mt-1">{lang === 'nl' ? 'Begin door je eerste datumprikker op te zetten!' : 'Start by building your very first poll!'}</p>
+                          <button
+                            onClick={() => setShowCreateForm(true)}
+                            className="mt-6 py-2 px-4 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all cursor-pointer shadow-md shadow-indigo-100"
+                          >
+                            {t.createNewPoll}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-6" id="active-polls-list">
+                      {displayedPolls.map((poll) => {
+                        const pollInvitees = dbService.getInviteesForPoll(poll.id);
+                        const votedCount = pollInvitees.filter(i => i.votedAt).length;
+                        const totalCount = pollInvitees.length;
+                        const percentVoted = totalCount > 0 ? Math.round((votedCount / totalCount) * 100) : 0;
+                        
+                        const isExpanded = expandedPollId === poll.id;
+                        const isFinalized = poll.finalizedOptionId !== null;
+
+                        return (
+                          <div key={poll.id} className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm hover:shadow-md transition-all">
                             
-                            <p className="text-xs text-slate-500 line-clamp-1">{poll.description || 'Geen omschrijving'}</p>
-                            
-                            <div className="flex items-center gap-3 text-[10px] text-slate-400 font-semibold pt-1 flex-wrap">
-                              <span>📅 {getDaysAgo(poll.createdAt)} {t.daysAgo}</span>
-                              <span>⏳ {getTimeUntilNextSlotText(poll.options)}</span>
-                              {poll.locationType && (
-                                <span className="bg-slate-100/80 text-slate-600 px-1.5 py-0.5 rounded font-bold border border-slate-200/60 flex items-center gap-1">
-                                  {poll.locationType === 'physical' && '🏢 Fysiek'}
-                                  {poll.locationType === 'digital' && '💻 Digitaal'}
-                                  {poll.locationType === 'hybrid' && '🌐 Hybride'}
-                                  {poll.locationAddress && ` - ${poll.locationAddress}`}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                            {/* Accordion header brief info summary */}
+                            <div className="p-5 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer" onClick={() => setExpandedPollId(isExpanded ? null : poll.id)}>
+                              <div className="flex items-start gap-4 flex-1">
+                                <div className={`h-11 w-11 rounded-2xl flex items-center justify-center text-lg font-bold shrink-0 ${
+                                  poll.archived
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                    : isFinalized 
+                                      ? 'bg-amber-100 text-amber-700 border border-amber-200' 
+                                      : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                }`}>
+                                  {poll.archived ? '📦' : isFinalized ? '🏆' : '🗳️'}
+                                </div>
+                                
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="font-bold text-slate-800 text-base">{poll.title}</h3>
+                                    {isFinalized && (
+                                      <span className="bg-amber-100 text-amber-800 text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1">
+                                        <span>📅</span> {lang === 'nl' ? 'Vastgelegd' : 'Finalized'}
+                                      </span>
+                                    )}
+                                    {poll.archived && (
+                                      <span className="bg-amber-50 text-amber-800 text-[9px] font-black uppercase px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
+                                        <Archive className="w-2.5 h-2.5" /> {lang === 'nl' ? 'Gearchiveerd' : 'Archived'}
+                                      </span>
+                                    )}
+                                    {poll.promotedMeetingId ? (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedMeetingIdForTab(poll.promotedMeetingId!);
+                                          setActiveTab('meetings');
+                                        }}
+                                        className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 cursor-pointer transition-colors"
+                                        title={lang === 'nl' ? 'Open vergadering in Notities, Afspraken & Acties' : 'Open in Notes, Agreements & Actions'}
+                                      >
+                                        <CheckSquare className="w-3 h-3 text-indigo-600" />
+                                        <span>{lang === 'nl' ? 'Meeting Gepland' : 'Meeting Planned'}</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handlePromotePollToMeeting(poll, e)}
+                                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 cursor-pointer transition-colors"
+                                        title={lang === 'nl' ? 'Promoveer deze datumprikker naar een meeting in Notities, Afspraken & Acties' : 'Promote this poll to a meeting'}
+                                      >
+                                        <FolderKanban className="w-3 h-3 text-emerald-600" />
+                                        <span>{lang === 'nl' ? 'Promoveer tot Meeting' : 'Promote to Meeting'}</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                  
+                                  <p className="text-xs text-slate-500 line-clamp-1">{poll.description || 'Geen omschrijving'}</p>
+                                  
+                                  <div className="flex items-center gap-3 text-[10px] text-slate-400 font-semibold pt-1 flex-wrap">
+                                    <span>📅 {getDaysAgo(poll.createdAt)} {t.daysAgo}</span>
+                                    <span>⏳ {getTimeUntilNextSlotText(poll.options)}</span>
+                                    {poll.locationType && (
+                                      <span className="bg-slate-100/80 text-slate-600 px-1.5 py-0.5 rounded font-bold border border-slate-200/60 flex items-center gap-1">
+                                        {poll.locationType === 'physical' && '🏢 Fysiek'}
+                                        {poll.locationType === 'digital' && '💻 Digitaal'}
+                                        {poll.locationType === 'hybrid' && '🌐 Hybride'}
+                                        {poll.locationAddress && ` - ${poll.locationAddress}`}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
 
-                        {/* Voting status dashboard percent visual meters */}
-                        <div className="flex items-center gap-6 self-start md:self-center" onClick={e => e.stopPropagation()}>
-                          <div className="text-right">
-                            <div className="text-xs font-bold text-slate-700">
-                              {votedCount} / {totalCount} {t.voted}
-                            </div>
-                            <div className="w-24 bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden border border-slate-200">
-                              <div
-                                className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
-                                style={{ width: `${percentVoted}%` }}
-                              />
-                            </div>
-                          </div>
+                              {/* Voting status dashboard percent visual meters */}
+                              <div className="flex items-center gap-4 sm:gap-6 self-start md:self-center flex-wrap" onClick={e => e.stopPropagation()}>
+                                <div className="text-right">
+                                  <div className="text-xs font-bold text-slate-700">
+                                    {votedCount} / {totalCount} {t.voted}
+                                  </div>
+                                  <div className="w-24 bg-slate-100 rounded-full h-1.5 mt-1 overflow-hidden border border-slate-200">
+                                    <div
+                                      className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+                                      style={{ width: `${percentVoted}%` }}
+                                    />
+                                  </div>
+                                </div>
 
-                          <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {/* Archive toggle button */}
+                                  <button
+                                    onClick={(e) => handleToggleArchivePoll(poll, e)}
+                                    className={`p-1.5 px-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                      poll.archived
+                                        ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+                                        : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
+                                    }`}
+                                    title={poll.archived ? (lang === 'nl' ? 'Zet terug uit archief' : 'Restore from archive') : (lang === 'nl' ? 'Verplaats naar archief datumprikkers' : 'Move to poll archive')}
+                                  >
+                                    {poll.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+                                    <span className="hidden sm:inline">{poll.archived ? (lang === 'nl' ? 'Herstel' : 'Restore') : (lang === 'nl' ? 'Archiveer' : 'Archive')}</span>
+                                  </button>
+
+                                  {isExpanded && (
+                                    <button
+                                      onClick={() => {
+                                        if (editingPollId === poll.id) {
+                                          setEditingPollId(null);
+                                        } else {
+                                          handleStartEdit(poll);
+                                        }
+                                      }}
+                                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                                        editingPollId === poll.id 
+                                          ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 font-bold font-sans' 
+                                          : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'
+                                      }`}
+                                      id={`edit-poll-btn-${poll.id}`}
+                                    >
+                                      ✏️ {editingPollId === poll.id ? (lang === 'nl' ? 'Bekijk Stats' : 'View Stats') : (lang === 'nl' ? 'Wijzigen' : 'Edit')}
+                                    </button>
+                                  )}
+
+                                  <button
+                                    onClick={() => {
+                                      setExpandedPollId(isExpanded ? null : poll.id);
+                                      if (editingPollId === poll.id) setEditingPollId(null);
+                                    }}
+                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-600 rounded-lg transition-all cursor-pointer"
+                                  >
+                                    {isExpanded ? (lang === 'nl' ? 'Sluiten' : 'Close') : (lang === 'nl' ? 'Bekijk Stats' : 'View Stats')}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeletePoll(poll.id)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                                    title="Delete Poll"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                            </div>
+
+                            {/* ACCORDION EXPANDED BODY STATS AND CONTROLS PANEL */}
                             {isExpanded && (
-                              <button
-                                onClick={() => {
-                                  if (editingPollId === poll.id) {
-                                    setEditingPollId(null);
-                                  } else {
-                                    handleStartEdit(poll);
-                                  }
-                                }}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${
-                                  editingPollId === poll.id 
-                                    ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 font-bold font-sans' 
-                                    : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'
-                                }`}
-                                id={`edit-poll-btn-${poll.id}`}
-                              >
-                                ✏️ {editingPollId === poll.id ? (lang === 'nl' ? 'Bekijk Stats' : 'View Stats') : (lang === 'nl' ? 'Wijzigen' : 'Edit')}
-                              </button>
-                            )}
-
-                            <button
-                              onClick={() => {
-                                setExpandedPollId(isExpanded ? null : poll.id);
-                                if (editingPollId === poll.id) setEditingPollId(null);
-                              }}
-                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-600 rounded-lg transition-all"
-                            >
-                              {isExpanded ? (lang === 'nl' ? 'Sluiten' : 'Close') : (lang === 'nl' ? 'Bekijk Stats' : 'View Stats')}
-                            </button>
-                            <button
-                              onClick={() => handleDeletePoll(poll.id)}
-                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
-                              title="Delete Poll"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      {/* ACCORDION EXPANDED BODY STATS AND CONTROLS PANEL */}
-                      {isExpanded && (
-                        <div className="border-t border-slate-100 bg-slate-50/20 p-5 md:p-6 space-y-8">
-                          {editingPollId === poll.id ? (
+                              <div className="border-t border-slate-100 bg-slate-50/20 p-5 md:p-6 space-y-8">
+                                {editingPollId === poll.id ? (
                             /* =================== INTEGRATED EDIT MODE =================== */
                             <div className="bg-white rounded-2xl p-5 md:p-6 border border-slate-200/60 shadow-sm space-y-6" id={`edit-panel-${poll.id}`}>
                               <div className="flex items-center justify-between border-b pb-3">
@@ -3888,24 +4328,56 @@ export default function App() {
                                             <Download className="h-3.5 w-3.5" />
                                             <span>Download .ICS file</span>
                                           </button>
+                                        <div className="w-full mt-3 pt-3 border-t border-amber-200/60 flex items-center justify-between flex-wrap gap-2">
+                                          <div className="text-[11px] text-slate-500 font-medium">
+                                            {poll.promotedMeetingId 
+                                              ? (lang === 'nl' ? '✅ Deze afspraak is overgenomen in Notities, Afspraken & Acties.' : '✅ This poll has been converted to a meeting.') 
+                                              : (lang === 'nl' ? '💡 Tip: Promoveer direct naar een vergadering met agenda, notities en actiepunten.' : '💡 Tip: Promote directly to a meeting with agenda, notes and actions.')}
+                                          </div>
+                                          {!poll.promotedMeetingId ? (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => handlePromotePollToMeeting(poll, e)}
+                                              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                                            >
+                                              <FolderKanban className="w-3.5 h-3.5" />
+                                              <span>{lang === 'nl' ? '🚀 Promoveer tot Meeting in Notities & Afspraken' : '🚀 Promote to Meeting in Notes & Actions'}</span>
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedMeetingIdForTab(poll.promotedMeetingId!);
+                                                setActiveTab('meetings');
+                                              }}
+                                              className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                                            >
+                                              <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
+                                              <span>{lang === 'nl' ? 'Open in Notities, Afspraken & Acties →' : 'Open in Notes, Agreements & Actions →'}</span>
+                                            </button>
+                                          )}
                                         </div>
-                                      );
-                                    })()}
-                                  </div>
-                                )}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
 
-                              </div>
-                            </>
-                          )}
+                            </div>
+                          </>
+                        )}
 
-                        </div>
-                      )}
+                      </div>
+                    )}
 
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    })()}
 
           </div>
         )}
